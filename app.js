@@ -40,7 +40,7 @@ const englishCopy = {
   maturityDate: "Final maturity date",
   currentRate: "Current interest rate",
   currentPayment: "Current monthly payment",
-  currentPaymentHelp: "Enter the payment shown by your bank. Leave blank to use our annuity estimate.",
+  currentPaymentHelp: "The regular payment set by your bank, excluding overpayments. Leave blank to use our estimate.",
   fixationEnd: "Current fixed-rate period ends",
   assumptionsTitle: "Comparison assumptions",
   assumptionsHelp: "The future rate is only an estimate. Below, you can see the rate at which the result changes.",
@@ -54,6 +54,7 @@ const englishCopy = {
   saved: "Saved locally",
   shareScenario: "Share scenario",
   result: "Comparison result",
+  lowerCost: "Lower-cost scenario",
   by: "by",
   scenario: "Scenario",
   payment: "Payment",
@@ -92,11 +93,12 @@ const messages = {
     fixationFuture: "Koniec aktuálnej fixácie musí byť v budúcnosti.",
     fixationBeforeMaturity: "Koniec fixácie musí nastať pred konečnou splatnosťou hypotéky.",
     horizonAfterFixation: "Horizont porovnania musí siahať za koniec aktuálnej fixácie.",
-    waitCheaper: "Čakanie vychádza lacnejšie",
-    nowCheaper: "Refixácia dnes vychádza lacnejšie",
-    equal: "Obe možnosti vychádzajú rovnako",
+    waitCheaper: "Počkať",
+    nowCheaper: "Refixovať dnes",
+    equal: "Rovnaké náklady",
     equalExplanation: (duration) => `Pri zadaných predpokladoch majú oba scenáre za ${duration} rovnaké náklady.`,
-    differenceExplanation: (duration) => `Rozdiel v zaplatených úrokoch a poplatkoch za ${duration}.`,
+    differenceExplanation: (duration) => `na úrokoch a poplatkoch počas ${duration}.`,
+    paymentMismatch: (estimate) => `Zadaná splátka sa výrazne líši od odhadu ${estimate}. Skontrolujte zostatok, splatnosť a sadzbu. Mimoriadne splátky sem nepatria.`,
     maturityRemaining: (duration) => `Zostáva približne ${duration}.`,
     fixationRemaining: (duration) => `Do konca fixácie zostáva približne ${duration}.`,
     copied: "Odkaz skopírovaný",
@@ -107,11 +109,12 @@ const messages = {
     fixationFuture: "The current fixed-rate period must end in the future.",
     fixationBeforeMaturity: "The fixed-rate period must end before the mortgage matures.",
     horizonAfterFixation: "The comparison horizon must extend beyond the current fixed-rate period.",
-    waitCheaper: "Waiting costs less",
-    nowCheaper: "Refixing today costs less",
-    equal: "Both options cost the same",
+    waitCheaper: "Wait",
+    nowCheaper: "Refix today",
+    equal: "Equal cost",
     equalExplanation: (duration) => `Under these assumptions, both scenarios have the same cost over ${duration}.`,
-    differenceExplanation: (duration) => `Difference in interest and fees paid over ${duration}.`,
+    differenceExplanation: (duration) => `in interest and fees over ${duration}.`,
+    paymentMismatch: (estimate) => `The payment differs significantly from the ${estimate} estimate. Check the balance, maturity and rate. Do not include overpayments here.`,
     maturityRemaining: (duration) => `Approximately ${duration} remaining.`,
     fixationRemaining: (duration) => `Approximately ${duration} until the fixed-rate period ends.`,
     copied: "Link copied",
@@ -280,6 +283,10 @@ function validate(values) {
   if (!form.checkValidity()) return message("invalid");
   if (values.totalMonths < 1) return message("maturityFuture");
   if (values.monthsToFix < 1) return message("fixationFuture");
+  const estimatedCurrentPayment = monthlyPayment(values.balance, values.currentRate, values.totalMonths);
+  if (values.currentPayment && Math.abs(values.currentPayment - estimatedCurrentPayment) / estimatedCurrentPayment > 0.15) {
+    return message("paymentMismatch", formatEuro(estimatedCurrentPayment, 2));
+  }
   if (values.currentPayment && values.currentPayment <= values.balance * (values.currentRate / 100 / 12)) {
     return currentLanguage === "sk"
       ? "Aktuálna splátka musí byť vyššia ako mesačný úrok."
@@ -390,7 +397,7 @@ function render() {
   const error = validate(values);
   errorMessage.hidden = !error;
   errorMessage.textContent = error;
-  resultsContent.style.opacity = error ? "0.45" : "1";
+  resultsContent.hidden = Boolean(error);
   if (error) return;
 
   const now = scenarioNow(values);
@@ -405,7 +412,9 @@ function render() {
   const outcome = difference > 0 ? "wait" : difference < 0 ? "now" : "even";
   const differenceBlock = document.querySelector(".difference-block");
   differenceBlock.dataset.outcome = outcome;
-  document.querySelector("#difference-label").textContent = currentLanguage === "sk" ? slovakCopy.get("result") : englishCopy.result;
+  document.querySelector("#difference-label").textContent = difference === 0
+    ? (currentLanguage === "sk" ? "Výsledok porovnania" : englishCopy.result)
+    : (currentLanguage === "sk" ? "Lacnejší scenár" : englishCopy.lowerCost);
   document.querySelector("#outcome-verdict").textContent = difference === 0
     ? message("equal")
     : message(difference > 0 ? "waitCheaper" : "nowCheaper");

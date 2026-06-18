@@ -7,7 +7,7 @@
     <title>Hypo Advisor</title>
     <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=2" />
-    <script src="app.js?v=3" defer></script>
+    <script src="app.js?v=4" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -63,7 +63,7 @@
                 <label class="field">
                   <span data-i18n="currentPayment">Aktuálna mesačná splátka</span>
                   <span class="input-shell"><input id="currentPayment" name="currentPayment" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Vypočítame" /><span>€</span></span>
-                  <small data-i18n="currentPaymentHelp">Zadajte splátku z banky. Ak pole necháte prázdne, použijeme anuitný odhad.</small>
+                  <small data-i18n="currentPaymentHelp">Pravidelná splátka určená bankou, bez mimoriadnych splátok. Prázdne pole použije náš odhad.</small>
                 </label>
                 <label class="field">
                   <span data-i18n="fixationEnd">Koniec aktuálnej fixácie</span>
@@ -123,7 +123,7 @@
 
             <div id="results-content">
               <div class="difference-block">
-                <p id="difference-label" data-i18n="result">Výsledok porovnania</p>
+                <p id="difference-label">Lacnejší scenár</p>
                 <strong id="outcome-verdict">Načítavam porovnanie…</strong>
                 <div class="amount-line"><span data-i18n="by">o</span><strong id="cost-difference">0 €</strong></div>
                 <p id="difference-explanation">Rozdiel v nákladoch za 5 rokov.</p>
