@@ -313,15 +313,55 @@ function save(values) {
 }
 
 function encodeUrlState(values) {
-  const compact = { v: URL_STATE_VERSION };
-  Object.entries(urlKeys).forEach(([key, shortKey]) => { compact[shortKey] = values[key]; });
-  return btoa(JSON.stringify(compact))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/u, "");
+  const number = (value, multiplier = 1) => Math.round(Number(value) * multiplier).toString(36);
+  const date = (value) => Number(value.replaceAll("-", "")).toString(36);
+  return [
+    2,
+    number(values.balance, 100),
+    date(values.maturityDate),
+    number(values.currentRate, 100),
+    date(values.fixationEndDate),
+    values.currentPayment ? number(values.currentPayment, 100) : "-",
+    number(values.rateNow, 100),
+    number(values.futureRate, 100),
+    number(values.switchCost, 100),
+    number(values.horizonYears),
+    values.language === "sk" ? "s" : "e",
+  ].join(".");
 }
 
 function decodeUrlState() {
+  const encoded = new URL(location.href).searchParams.get("s");
+  if (encoded) {
+    try {
+      const parts = encoded.split(".");
+      if (parts.length !== 11 || parts[0] !== "2") return null;
+      const numericPartsAreValid = parts.slice(1, 10).every((part, index) => (
+        index === 4 ? /^(?:-|[0-9a-z]+)$/u.test(part) : /^[0-9a-z]+$/u.test(part)
+      ));
+      if (!numericPartsAreValid || !/^[se]$/u.test(parts[10])) return null;
+      const number = (value, divisor = 1) => parseInt(value, 36) / divisor;
+      const date = (value) => {
+        const raw = String(parseInt(value, 36)).padStart(8, "0");
+        return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+      };
+      return {
+        balance: number(parts[1], 100),
+        maturityDate: date(parts[2]),
+        currentRate: number(parts[3], 100),
+        fixationEndDate: date(parts[4]),
+        currentPayment: parts[5] === "-" ? null : number(parts[5], 100),
+        rateNow: number(parts[6], 100),
+        futureRate: number(parts[7], 100),
+        switchCost: number(parts[8], 100),
+        horizonYears: number(parts[9]),
+        language: parts[10] === "s" ? "sk" : "en",
+      };
+    } catch {
+      return null;
+    }
+  }
+
   const match = location.hash.match(/^#s=([A-Za-z0-9_-]+)$/u);
   if (!match) return null;
   try {
@@ -340,7 +380,8 @@ function decodeUrlState() {
 
 function updateUrl(values) {
   const url = new URL(location.href);
-  url.hash = `s=${encodeUrlState(values)}`;
+  url.searchParams.set("s", encodeUrlState(values));
+  url.hash = "";
   history.replaceState(null, "", url);
 }
 
