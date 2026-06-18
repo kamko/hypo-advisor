@@ -60,6 +60,11 @@
                   <span class="input-shell"><input id="currentRate" name="currentRate" type="number" min="0" max="20" step="0.01" inputmode="decimal" value="1.49" required /><span>%</span></span>
                 </label>
                 <label class="field">
+                  <span data-i18n="currentPayment">Aktuálna mesačná splátka</span>
+                  <span class="input-shell"><input id="currentPayment" name="currentPayment" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Vypočítame" /><span>€</span></span>
+                  <small data-i18n="currentPaymentHelp">Zadajte splátku z banky. Ak pole necháte prázdne, použijeme anuitný odhad.</small>
+                </label>
+                <label class="field">
                   <span data-i18n="fixationEnd">Koniec aktuálnej fixácie</span>
                   <span class="input-shell date-shell"><input id="fixationEndDate" name="fixationEndDate" type="date" required /></span>
                   <small id="fixation-helper">Dobu do refixácie vypočítame od dnešného dátumu.</small>

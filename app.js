@@ -13,6 +13,7 @@ const defaults = {
   balance: 120000,
   maturityDate: addMonthsToToday(22 * 12),
   currentRate: 1.49,
+  currentPayment: null,
   fixationEndDate: addMonthsToToday(8),
   rateNow: 3.89,
   futureRate: 3.49,
@@ -38,6 +39,8 @@ const englishCopy = {
   balance: "Outstanding mortgage balance",
   maturityDate: "Final maturity date",
   currentRate: "Current interest rate",
+  currentPayment: "Current monthly payment",
+  currentPaymentHelp: "Enter the payment shown by your bank. Leave blank to use our annuity estimate.",
   fixationEnd: "Current fixed-rate period ends",
   assumptionsTitle: "Comparison assumptions",
   assumptionsHelp: "The future rate is only an estimate. Below, you can see the rate at which the result changes.",
@@ -119,6 +122,7 @@ const urlKeys = {
   balance: "b",
   maturityDate: "md",
   currentRate: "cr",
+  currentPayment: "cp",
   fixationEndDate: "fd",
   rateNow: "rn",
   futureRate: "fr",
@@ -161,6 +165,7 @@ function applyLanguage() {
   document.querySelectorAll("[data-language]").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.language === currentLanguage));
   });
+  document.querySelector("#currentPayment").placeholder = currentLanguage === "sk" ? "Vypočítame" : "Calculated automatically";
 }
 
 function monthlyPayment(principal, annualRate, months) {
@@ -170,11 +175,11 @@ function monthlyPayment(principal, annualRate, months) {
   return principal * (rate * (1 + rate) ** months) / ((1 + rate) ** months - 1);
 }
 
-function simulate(principal, annualRate, totalMonths, monthsToRun) {
+function simulate(principal, annualRate, totalMonths, monthsToRun, paymentOverride = null) {
   let balance = principal;
   let interest = 0;
   let paid = 0;
-  const payment = monthlyPayment(principal, annualRate, totalMonths);
+  const payment = paymentOverride || monthlyPayment(principal, annualRate, totalMonths);
   const monthlyRate = annualRate / 100 / 12;
   const run = Math.min(monthsToRun, totalMonths);
 
@@ -205,7 +210,7 @@ function scenarioWait(values, futureRate = values.futureRate) {
   const totalMonths = values.totalMonths;
   const horizonMonths = Math.min(values.horizonYears * 12, totalMonths);
   const firstMonths = Math.min(values.monthsToFix, horizonMonths);
-  const first = simulate(values.balance, values.currentRate, totalMonths, firstMonths);
+  const first = simulate(values.balance, values.currentRate, totalMonths, firstMonths, values.currentPayment);
   const remainingHorizon = horizonMonths - firstMonths;
   const remainingTerm = totalMonths - firstMonths;
   const second = simulate(first.balance, futureRate, remainingTerm, remainingHorizon);
@@ -234,7 +239,7 @@ function findBreakEven(values, targetCost) {
 function getValues() {
   const values = Object.fromEntries(inputs.map((input) => [
     input.name,
-    input.type === "date" ? input.value : Number(input.value),
+    input.type === "date" ? input.value : input.value === "" ? null : Number(input.value),
   ]));
   values.totalMonths = monthsUntil(values.maturityDate);
   values.monthsToFix = monthsUntil(values.fixationEndDate);
@@ -275,6 +280,11 @@ function validate(values) {
   if (!form.checkValidity()) return message("invalid");
   if (values.totalMonths < 1) return message("maturityFuture");
   if (values.monthsToFix < 1) return message("fixationFuture");
+  if (values.currentPayment && values.currentPayment <= values.balance * (values.currentRate / 100 / 12)) {
+    return currentLanguage === "sk"
+      ? "Aktuálna splátka musí byť vyššia ako mesačný úrok."
+      : "The current payment must be higher than the monthly interest.";
+  }
   if (parseLocalDate(values.fixationEndDate) >= parseLocalDate(values.maturityDate)) return message("fixationBeforeMaturity");
   if (values.horizonYears * 12 <= values.monthsToFix) return message("horizonAfterFixation");
   return "";
