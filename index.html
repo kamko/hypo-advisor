@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Porovnanie refixácie hypotéky dnes a čakania do konca fixácie." />
     <title>Hypo Advisor</title>
-    <link rel="stylesheet" href="styles.css" />
-    <script src="app.js" defer></script>
+    <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=2" />
+    <script src="app.js?v=2" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -111,7 +112,10 @@
               </div>
               <div class="result-actions">
                 <span id="saved-state" class="saved-state" data-i18n="saved">Uložené lokálne</span>
-                <button id="copy-link" type="button" data-i18n="copyLink">Kopírovať odkaz na tento scenár</button>
+                <button id="copy-link" type="button">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                  <span data-i18n="shareScenario">Zdieľať scenár</span>
+                </button>
               </div>
             </div>
 
@@ -137,7 +141,7 @@
                   <strong id="now-cost" role="cell">—</strong>
                 </div>
                 <div id="scenario-wait-row" class="scenario-row" role="row">
-                  <span role="cell"><i class="scenario-dot wait"></i><span data-i18n="wait">Počkať</span> <b id="wait-months-label">8 mesiacov</b></span>
+                  <span role="cell"><i class="scenario-dot wait"></i><span data-i18n="wait">Počkať</span> <b id="wait-months-label">8 mesiacov</b><b id="current-payment-source">Anuitný odhad</b></span>
                   <strong id="wait-payment" class="payment-change" role="cell">—</strong>
                   <strong id="wait-cost" role="cell">—</strong>
                 </div>

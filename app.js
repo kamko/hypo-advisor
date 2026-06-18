@@ -52,7 +52,7 @@ const englishCopy = {
   yearsSuffix: "years",
   comparison: "Comparison",
   saved: "Saved locally",
-  copyLink: "Copy link to this scenario",
+  shareScenario: "Share scenario",
   result: "Comparison result",
   by: "by",
   scenario: "Scenario",
@@ -375,6 +375,9 @@ function render() {
   document.querySelector("#wait-payment").textContent = `${formatEuro(wait.paymentBefore, 2)} → ${formatEuro(wait.paymentAfter, 2)}`;
   document.querySelector("#wait-cost").textContent = formatEuro(wait.cost);
   document.querySelector("#wait-months-label").textContent = pluralMonths(values.monthsToFix);
+  document.querySelector("#current-payment-source").textContent = values.currentPayment
+    ? (currentLanguage === "sk" ? "Splátka z banky" : "Payment from bank")
+    : (currentLanguage === "sk" ? "Anuitný odhad" : "Annuity estimate");
   document.querySelector("#maturity-helper").textContent = message("maturityRemaining", formatRemainingMonths(values.totalMonths));
   document.querySelector("#fixation-helper").textContent = message("fixationRemaining", pluralMonths(values.monthsToFix));
   document.querySelector("#scenario-now-row").classList.toggle("is-cheaper", outcome === "now");
@@ -418,10 +421,11 @@ function load() {
 }
 
 async function copyShareLink() {
-  const originalLabel = copyLinkButton.textContent;
+  const label = copyLinkButton.querySelector("span");
+  const originalLabel = label.textContent;
   try {
     await navigator.clipboard.writeText(location.href);
-    copyLinkButton.textContent = message("copied");
+    label.textContent = message("copied");
   } catch {
     const temporary = document.createElement("textarea");
     temporary.value = location.href;
@@ -432,9 +436,9 @@ async function copyShareLink() {
     temporary.select();
     document.execCommand("copy");
     temporary.remove();
-    copyLinkButton.textContent = message("copied");
+    label.textContent = message("copied");
   }
-  window.setTimeout(() => { copyLinkButton.textContent = originalLabel; }, 1800);
+  window.setTimeout(() => { label.textContent = originalLabel; }, 1800);
 }
 
 form.addEventListener("input", render);
