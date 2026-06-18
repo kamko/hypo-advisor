@@ -377,7 +377,11 @@ h1 {
 }
 
 .tradeoff-list span { color: var(--muted); }
-.tradeoff-list strong { text-align: right; font-variant-numeric: tabular-nums; }
+.tradeoff-list strong {
+  flex: 0 0 auto;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 .difference-block > p:last-child {
   margin: 13px 0 0;

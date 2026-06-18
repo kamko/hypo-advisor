@@ -440,7 +440,7 @@ function render() {
     : (balanceAdvantage >= 0 ? "lower" : "higher");
 
   document.querySelector("#difference-label").textContent = currentLanguage === "sk"
-    ? `Po ${duration}`
+    ? `Po ${values.horizonYears} ${values.horizonYears === 1 ? "roku" : "rokoch"}`
     : `After ${duration}`;
   document.querySelector("#cost-headline").textContent = costAdvantage < 0.5
     ? (currentLanguage === "sk" ? "Oba scenáre majú rovnaké úroky a poplatky." : "Both scenarios have the same interest and fees.")
@@ -448,9 +448,9 @@ function render() {
       ? `${subjectName} ušetrí ${formatEuro(costAdvantage)} na úrokoch a poplatkoch.`
       : `${subjectName} saves ${formatEuro(costAdvantage)} in interest and fees.`);
   document.querySelector("#cashflow-label").textContent = currentLanguage === "sk" ? "Z účtu odíde" : "Cash outflow is";
-  document.querySelector("#cashflow-detail").textContent = `${formatEuro(Math.abs(cashAdvantage))} ${cashWord}`;
+  document.querySelector("#cashflow-detail").textContent = `${currentLanguage === "sk" ? "o " : ""}${formatEuro(Math.abs(cashAdvantage))} ${cashWord}`;
   document.querySelector("#balance-label").textContent = currentLanguage === "sk" ? "Zostávajúci dlh bude" : "Outstanding balance is";
-  document.querySelector("#balance-detail").textContent = `${formatEuro(Math.abs(balanceAdvantage))} ${balanceWord}`;
+  document.querySelector("#balance-detail").textContent = `${currentLanguage === "sk" ? "o " : ""}${formatEuro(Math.abs(balanceAdvantage))} ${balanceWord}`;
 
   const connector = cashAdvantage >= 0 && balanceAdvantage >= 0
     ? " + "
