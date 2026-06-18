@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="sk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Porovnanie refixácie hypotéky dnes a čakania do konca fixácie." />
+    <title>Hypo Advisor</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Hypo Advisor – domov">
+        <span class="brand-mark" aria-hidden="true">H</span>
+        <span>Hypo Advisor</span>
+      </a>
+      <div class="header-actions">
+        <div class="privacy-note">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 10V8a5 5 0 0 1 10 0v2m-9 0h8a2 2 0 0 1 2 2v7H6v-7a2 2 0 0 1 2-2Z"/></svg>
+          <span data-i18n="privacy">Údaje ostávajú v tomto zariadení</span>
+        </div>
+        <div class="language-switch" aria-label="Language">
+          <button type="button" data-language="sk" aria-pressed="true">SK</button>
+          <button type="button" data-language="en" aria-pressed="false">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="intro" aria-labelledby="page-title">
+        <p class="context-label" data-i18n="context">Rozhodovanie pred koncom fixácie</p>
+        <h1 id="page-title" data-i18n="title">Refixovať dnes alebo počkať?</h1>
+        <p data-i18n="intro">Porovnajte si obe možnosti na rovnakom časovom horizonte. Bez registrácie a bez odporúčania, ktoré by skrývalo predpoklady.</p>
+      </section>
+
+      <form id="mortgage-form" novalidate>
+        <div class="workspace">
+          <div class="inputs-column">
+            <section class="form-section" aria-labelledby="mortgage-heading">
+              <div class="section-heading">
+                <div>
+                  <span class="step">1</span>
+                  <h2 id="mortgage-heading" data-i18n="mortgageTitle">Vaša hypotéka dnes</h2>
+                </div>
+                <p data-i18n="mortgageHelp">Hodnoty nájdete v internet bankingu alebo v úverovej zmluve.</p>
+              </div>
+
+              <div class="field-grid">
+                <label class="field">
+                  <span data-i18n="balance">Zostatok hypotéky</span>
+                  <span class="input-shell"><input id="balance" name="balance" type="number" min="1000" step="0.01" inputmode="decimal" value="120000" required /><span>€</span></span>
+                </label>
+                <label class="field">
+                  <span data-i18n="maturityDate">Dátum konečnej splatnosti</span>
+                  <span class="input-shell date-shell"><input id="maturityDate" name="maturityDate" type="date" required /></span>
+                  <small id="maturity-helper">Zostávajúcu dobu vypočítame od dnešného dátumu.</small>
+                </label>
+                <label class="field">
+                  <span data-i18n="currentRate">Aktuálna úroková sadzba</span>
+                  <span class="input-shell"><input id="currentRate" name="currentRate" type="number" min="0" max="20" step="0.01" inputmode="decimal" value="1.49" required /><span>%</span></span>
+                </label>
+                <label class="field">
+                  <span data-i18n="fixationEnd">Koniec aktuálnej fixácie</span>
+                  <span class="input-shell date-shell"><input id="fixationEndDate" name="fixationEndDate" type="date" required /></span>
+                  <small id="fixation-helper">Dobu do refixácie vypočítame od dnešného dátumu.</small>
+                </label>
+              </div>
+            </section>
+
+            <section class="form-section" aria-labelledby="scenario-heading">
+              <div class="section-heading">
+                <div>
+                  <span class="step">2</span>
+                  <h2 id="scenario-heading" data-i18n="assumptionsTitle">Predpoklady porovnania</h2>
+                </div>
+                <p data-i18n="assumptionsHelp">Budúca sadzba je iba odhad. Nižšie uvidíte, pri akej sadzbe sa výsledok otočí.</p>
+              </div>
+
+              <div class="field-grid">
+                <label class="field">
+                  <span data-i18n="rateNow">Sadzba pri refixácii dnes</span>
+                  <span class="input-shell"><input id="rateNow" name="rateNow" type="number" min="0" max="20" step="0.01" inputmode="decimal" value="3.89" required /><span>%</span></span>
+                </label>
+                <label class="field">
+                  <span data-i18n="futureRate">Očakávaná sadzba po fixácii</span>
+                  <span class="input-shell"><input id="futureRate" name="futureRate" type="number" min="0" max="20" step="0.01" inputmode="decimal" value="3.49" required /><span>%</span></span>
+                </label>
+                <label class="field">
+                  <span data-i18n="switchCost">Náklady na zmenu dnes</span>
+                  <span class="input-shell"><input id="switchCost" name="switchCost" type="number" min="0" step="0.01" inputmode="decimal" value="0" required /><span>€</span></span>
+                  <small data-i18n="switchCostHelp">Napr. poplatok banke alebo za znalecký posudok.</small>
+                </label>
+                <label class="field">
+                  <span data-i18n="horizon">Horizont porovnania</span>
+                  <span class="input-shell"><input id="horizonYears" name="horizonYears" type="number" min="1" max="10" step="1" inputmode="numeric" value="3" required /><span data-i18n="yearsSuffix">rokov</span></span>
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <aside class="results" aria-labelledby="results-heading" aria-live="polite">
+            <div class="results-title-row">
+              <div>
+                <span class="step">3</span>
+                <h2 id="results-heading" data-i18n="comparison">Porovnanie</h2>
+              </div>
+              <div class="result-actions">
+                <span id="saved-state" class="saved-state" data-i18n="saved">Uložené lokálne</span>
+                <button id="copy-link" type="button" data-i18n="copyLink">Kopírovať odkaz</button>
+              </div>
+            </div>
+
+            <div id="error-message" class="error-message" role="alert" hidden></div>
+
+            <div id="results-content">
+              <div class="difference-block">
+                <p id="difference-label" data-i18n="result">Výsledok porovnania</p>
+                <strong id="outcome-verdict">Načítavam porovnanie…</strong>
+                <div class="amount-line"><span data-i18n="by">o</span><strong id="cost-difference">0 €</strong></div>
+                <p id="difference-explanation">Rozdiel v nákladoch za 5 rokov.</p>
+              </div>
+
+              <div class="scenario-table" role="table" aria-label="Porovnanie scenárov">
+                <div class="scenario-row scenario-head" role="row">
+                  <span role="columnheader" data-i18n="scenario">Scenár</span>
+                  <span role="columnheader" data-i18n="payment">Splátka</span>
+                  <span role="columnheader" data-i18n="interestFees">Úroky + poplatky</span>
+                </div>
+                <div id="scenario-now-row" class="scenario-row" role="row">
+                  <span role="cell"><i class="scenario-dot now"></i><span data-i18n="refixNow">Refixovať dnes</span></span>
+                  <strong id="now-payment" role="cell">—</strong>
+                  <strong id="now-cost" role="cell">—</strong>
+                </div>
+                <div id="scenario-wait-row" class="scenario-row" role="row">
+                  <span role="cell"><i class="scenario-dot wait"></i><span data-i18n="wait">Počkať</span> <b id="wait-months-label">8 mesiacov</b></span>
+                  <strong id="wait-payment" class="payment-change" role="cell">—</strong>
+                  <strong id="wait-cost" role="cell">—</strong>
+                </div>
+              </div>
+
+              <div class="balance-table" role="table" aria-label="Peňažný tok a zostávajúci dlh">
+                <div class="balance-row balance-head" role="row">
+                  <span role="columnheader"></span>
+                  <span role="columnheader" data-i18n="refixShort">Refix dnes</span>
+                  <span role="columnheader" data-i18n="wait">Počkať</span>
+                </div>
+                <div class="balance-row" role="row">
+                  <span role="rowheader" data-i18n="totalPaid">Spolu odíde z účtu</span>
+                  <strong id="now-paid" role="cell">—</strong>
+                  <strong id="wait-paid" role="cell">—</strong>
+                </div>
+                <div class="balance-row" role="row">
+                  <span role="rowheader" data-i18n="principalPaid">Z toho splatená istina</span>
+                  <strong id="now-principal-paid" role="cell">—</strong>
+                  <strong id="wait-principal-paid" role="cell">—</strong>
+                </div>
+                <div class="balance-row" role="row">
+                  <span role="rowheader" data-i18n="balanceAfter">Zostatok po horizonte</span>
+                  <strong id="now-balance" role="cell">—</strong>
+                  <strong id="wait-balance" role="cell">—</strong>
+                </div>
+              </div>
+
+              <div class="timeline" aria-label="Priebeh scenárov v čase">
+                <div class="timeline-labels"><span data-i18n="today">Dnes</span><span id="fix-point-label">O 8 mes.</span><span id="horizon-label">O 3 r.</span></div>
+                <div class="timeline-track"><span id="fix-marker"></span></div>
+                <div class="timeline-copy"><span data-i18n="currentFixation">Aktuálna fixácia</span><span data-i18n="newRate">Nová sadzba</span></div>
+              </div>
+
+              <div class="break-even">
+                <div>
+                  <span data-i18n="breakEven">Hraničná budúca sadzba</span>
+                  <strong id="break-even-rate">—</strong>
+                </div>
+                <p data-i18n="breakEvenHelp">Ak bude sadzba po konci fixácie približne na tejto úrovni, náklady oboch scenárov budú rovnaké.</p>
+              </div>
+
+              <details>
+                <summary data-i18n="calculationTitle">Ako to počítame</summary>
+                <p data-i18n="calculationHelp">Pri čakaní počítame dnešnú splátku až do konca fixácie a potom novú splátku. Pri refixácii dnes počítame novú splátku odteraz. Každú splátku rozdelíme na úrok a istinu. Iba istina znižuje zostávajúci dlh.</p>
+              </details>
+            </div>
+          </aside>
+        </div>
+      </form>
+
+      <section class="variants" aria-labelledby="variants-heading">
+        <div class="variants-heading">
+          <div>
+            <h2 id="variants-heading" data-i18n="otherDecisions">Ďalšie rozhodnutia</h2>
+            <p data-i18n="otherDecisionsHelp">Postupne sem pribudnú ďalšie situácie okolo hypotéky.</p>
+          </div>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Typ porovnania">
+          <button type="button" role="tab" aria-selected="true" data-i18n="fixationEndTab">Koniec fixácie</button>
+          <button type="button" role="tab" aria-selected="false" disabled><span class="tab-label" data-i18n="mortgageIncrease">Navýšenie hypotéky</span> <span class="soon" data-i18n="later">Neskôr</span></button>
+          <button type="button" role="tab" aria-selected="false" disabled><span class="tab-label" data-i18n="mortgageInvestment">Hypotéka alebo investícia</span> <span class="soon" data-i18n="later">Neskôr</span></button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p data-i18n="disclaimer">Orientačný výpočet, nie finančné poradenstvo. Banka môže splátku vypočítať odlišne.</p>
+      <button id="reset-button" type="button" data-i18n="reset">Obnoviť vzorové hodnoty</button>
+    </footer>
+  </body>
+</html>
