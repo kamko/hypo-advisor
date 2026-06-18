@@ -355,9 +355,18 @@ h1 {
   font-size: 13px;
 }
 
-.delta-list { margin-top: 13px; border-top: 1px solid var(--line); }
+.difference-block > #cost-headline {
+  display: block;
+  max-width: 25ch;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
 
-.delta-list > div {
+.tradeoff-list { margin-top: 20px; border-top: 1px solid var(--line); }
+
+.tradeoff-list > div {
   min-height: 46px;
   display: flex;
   align-items: center;
@@ -367,13 +376,13 @@ h1 {
   font-size: 13px;
 }
 
-.delta-list span { color: var(--muted); }
-.delta-list strong { text-align: right; font-variant-numeric: tabular-nums; }
+.tradeoff-list span { color: var(--muted); }
+.tradeoff-list strong { text-align: right; font-variant-numeric: tabular-nums; }
 
 .difference-block > p:last-child {
   margin: 13px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1.55;
 }
 

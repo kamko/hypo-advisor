@@ -7,7 +7,7 @@
     <title>Hypo Advisor</title>
     <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=2" />
-    <script src="app.js?v=6" defer></script>
+    <script src="app.js?v=7" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -123,13 +123,13 @@
 
             <div id="results-content">
               <div class="difference-block">
-                <p id="difference-label">Rozdiel medzi scenármi</p>
-                <div class="delta-list">
-                  <div><span data-i18n="lowerCost">Nižšie úroky a poplatky</span><strong id="cost-summary">—</strong></div>
-                  <div><span data-i18n="lowerCashflow">Nižší odtok peňazí</span><strong id="cashflow-summary">—</strong></div>
-                  <div><span data-i18n="lowerBalance">Nižší zostatok dlhu</span><strong id="balance-summary">—</strong></div>
+                <p id="difference-label">Po 3 rokoch</p>
+                <strong id="cost-headline">—</strong>
+                <div class="tradeoff-list">
+                  <div><span id="cashflow-label">Z účtu odíde</span><strong id="cashflow-detail">—</strong></div>
+                  <div><span id="balance-label">Zostávajúci dlh bude</span><strong id="balance-detail">—</strong></div>
                 </div>
-                <p data-i18n="summaryHelp">Splatená istina nie je náklad — znižuje zostávajúci dlh.</p>
+                <p id="result-equation">—</p>
               </div>
 
               <div class="scenario-table" role="table" aria-label="Porovnanie scenárov">

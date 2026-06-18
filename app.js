@@ -423,19 +423,41 @@ function render() {
   const now = scenarioNow(values);
   const wait = scenarioWait(values);
   const duration = pluralYears(values.horizonYears);
-  const lowerValue = (delta) => {
-    if (Math.abs(delta) < 0.5) return currentLanguage === "sk" ? "Rovnako" : "Equal";
-    const scenario = delta > 0
-      ? (currentLanguage === "sk" ? "Počkať" : "Wait")
-      : (currentLanguage === "sk" ? "Refix dnes" : "Refix today");
-    return `${scenario} · ${formatEuro(Math.abs(delta))}`;
-  };
+  const waitHasLowerCost = wait.cost <= now.cost;
+  const subject = waitHasLowerCost ? wait : now;
+  const other = waitHasLowerCost ? now : wait;
+  const subjectName = currentLanguage === "sk"
+    ? (waitHasLowerCost ? "Čakanie" : "Refixácia dnes")
+    : (waitHasLowerCost ? "Waiting" : "Refixing today");
+  const costAdvantage = Math.abs(other.cost - subject.cost);
+  const cashAdvantage = other.paid - subject.paid;
+  const balanceAdvantage = other.balance - subject.balance;
+  const cashWord = currentLanguage === "sk"
+    ? (cashAdvantage >= 0 ? "menej" : "viac")
+    : (cashAdvantage >= 0 ? "less" : "more");
+  const balanceWord = currentLanguage === "sk"
+    ? (balanceAdvantage >= 0 ? "nižší" : "vyšší")
+    : (balanceAdvantage >= 0 ? "lower" : "higher");
+
   document.querySelector("#difference-label").textContent = currentLanguage === "sk"
-    ? `Rozdiel po ${duration}`
-    : `Difference after ${duration}`;
-  document.querySelector("#cost-summary").textContent = lowerValue(now.cost - wait.cost);
-  document.querySelector("#cashflow-summary").textContent = lowerValue(now.paid - wait.paid);
-  document.querySelector("#balance-summary").textContent = lowerValue(now.balance - wait.balance);
+    ? `Po ${duration}`
+    : `After ${duration}`;
+  document.querySelector("#cost-headline").textContent = costAdvantage < 0.5
+    ? (currentLanguage === "sk" ? "Oba scenáre majú rovnaké úroky a poplatky." : "Both scenarios have the same interest and fees.")
+    : (currentLanguage === "sk"
+      ? `${subjectName} ušetrí ${formatEuro(costAdvantage)} na úrokoch a poplatkoch.`
+      : `${subjectName} saves ${formatEuro(costAdvantage)} in interest and fees.`);
+  document.querySelector("#cashflow-label").textContent = currentLanguage === "sk" ? "Z účtu odíde" : "Cash outflow is";
+  document.querySelector("#cashflow-detail").textContent = `${formatEuro(Math.abs(cashAdvantage))} ${cashWord}`;
+  document.querySelector("#balance-label").textContent = currentLanguage === "sk" ? "Zostávajúci dlh bude" : "Outstanding balance is";
+  document.querySelector("#balance-detail").textContent = `${formatEuro(Math.abs(balanceAdvantage))} ${balanceWord}`;
+
+  const connector = cashAdvantage >= 0 && balanceAdvantage >= 0
+    ? " + "
+    : (currentLanguage === "sk" ? ", ale " : ", but ");
+  document.querySelector("#result-equation").textContent = currentLanguage === "sk"
+    ? `${formatEuro(Math.abs(cashAdvantage))} ${cashWord} z účtu${connector}${formatEuro(Math.abs(balanceAdvantage))} ${balanceWord} dlh = ${formatEuro(costAdvantage)} úspora.`
+    : `${formatEuro(Math.abs(cashAdvantage))} ${cashWord} cash outflow${connector}${formatEuro(Math.abs(balanceAdvantage))} ${balanceWord} debt = ${formatEuro(costAdvantage)} saved.`;
   document.querySelector("#now-payment").textContent = formatEuro(now.payment, 2);
   document.querySelector("#now-cost").textContent = formatEuro(now.cost);
   document.querySelector("#wait-payment").textContent = `${formatEuro(wait.paymentBefore, 2)} → ${formatEuro(wait.paymentAfter, 2)}`;
