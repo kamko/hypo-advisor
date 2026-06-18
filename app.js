@@ -54,7 +54,10 @@ const englishCopy = {
   saved: "Saved locally",
   shareScenario: "Share scenario",
   result: "Comparison result",
-  lowerCost: "Lower-cost scenario",
+  lowerCost: "Lower interest and fees",
+  lowerCashflow: "Lower cash outflow",
+  lowerBalance: "Lower outstanding balance",
+  summaryHelp: "Principal repaid is not a cost — it reduces the outstanding balance.",
   by: "by",
   scenario: "Scenario",
   payment: "Payment",
@@ -98,7 +101,6 @@ const messages = {
     equal: "Rovnaké náklady",
     equalExplanation: (duration) => `Pri zadaných predpokladoch majú oba scenáre za ${duration} rovnaké náklady.`,
     differenceExplanation: (duration) => `na úrokoch a poplatkoch počas ${duration}.`,
-    paymentMismatch: (estimate) => `Zadaná splátka sa výrazne líši od odhadu ${estimate}. Skontrolujte zostatok, splatnosť a sadzbu. Mimoriadne splátky sem nepatria.`,
     maturityRemaining: (duration) => `Zostáva približne ${duration}.`,
     fixationRemaining: (duration) => `Do konca fixácie zostáva približne ${duration}.`,
     copied: "Odkaz skopírovaný",
@@ -114,7 +116,6 @@ const messages = {
     equal: "Equal cost",
     equalExplanation: (duration) => `Under these assumptions, both scenarios have the same cost over ${duration}.`,
     differenceExplanation: (duration) => `in interest and fees over ${duration}.`,
-    paymentMismatch: (estimate) => `The payment differs significantly from the ${estimate} estimate. Check the balance, maturity and rate. Do not include overpayments here.`,
     maturityRemaining: (duration) => `Approximately ${duration} remaining.`,
     fixationRemaining: (duration) => `Approximately ${duration} until the fixed-rate period ends.`,
     copied: "Link copied",
@@ -283,10 +284,6 @@ function validate(values) {
   if (!form.checkValidity()) return message("invalid");
   if (values.totalMonths < 1) return message("maturityFuture");
   if (values.monthsToFix < 1) return message("fixationFuture");
-  const estimatedCurrentPayment = monthlyPayment(values.balance, values.currentRate, values.totalMonths);
-  if (values.currentPayment && Math.abs(values.currentPayment - estimatedCurrentPayment) / estimatedCurrentPayment > 0.15) {
-    return message("paymentMismatch", formatEuro(estimatedCurrentPayment, 2));
-  }
   if (values.currentPayment && values.currentPayment <= values.balance * (values.currentRate / 100 / 12)) {
     return currentLanguage === "sk"
       ? "Aktuálna splátka musí byť vyššia ako mesačný úrok."
@@ -402,24 +399,20 @@ function render() {
 
   const now = scenarioNow(values);
   const wait = scenarioWait(values);
-  const difference = now.cost - wait.cost;
-  const absDifference = Math.abs(difference);
   const duration = pluralYears(values.horizonYears);
-  const explanation = difference === 0
-    ? message("equalExplanation", duration)
-    : message("differenceExplanation", duration);
-
-  const outcome = difference > 0 ? "wait" : difference < 0 ? "now" : "even";
-  const differenceBlock = document.querySelector(".difference-block");
-  differenceBlock.dataset.outcome = outcome;
-  document.querySelector("#difference-label").textContent = difference === 0
-    ? (currentLanguage === "sk" ? "Výsledok porovnania" : englishCopy.result)
-    : (currentLanguage === "sk" ? "Lacnejší scenár" : englishCopy.lowerCost);
-  document.querySelector("#outcome-verdict").textContent = difference === 0
-    ? message("equal")
-    : message(difference > 0 ? "waitCheaper" : "nowCheaper");
-  document.querySelector("#cost-difference").textContent = formatEuro(absDifference);
-  document.querySelector("#difference-explanation").textContent = explanation;
+  const lowerValue = (delta) => {
+    if (Math.abs(delta) < 0.5) return currentLanguage === "sk" ? "Rovnako" : "Equal";
+    const scenario = delta > 0
+      ? (currentLanguage === "sk" ? "Počkať" : "Wait")
+      : (currentLanguage === "sk" ? "Refix dnes" : "Refix today");
+    return `${scenario} · ${formatEuro(Math.abs(delta))}`;
+  };
+  document.querySelector("#difference-label").textContent = currentLanguage === "sk"
+    ? `Rozdiel po ${duration}`
+    : `Difference after ${duration}`;
+  document.querySelector("#cost-summary").textContent = lowerValue(now.cost - wait.cost);
+  document.querySelector("#cashflow-summary").textContent = lowerValue(now.paid - wait.paid);
+  document.querySelector("#balance-summary").textContent = lowerValue(now.balance - wait.balance);
   document.querySelector("#now-payment").textContent = formatEuro(now.payment, 2);
   document.querySelector("#now-cost").textContent = formatEuro(now.cost);
   document.querySelector("#wait-payment").textContent = `${formatEuro(wait.paymentBefore, 2)} → ${formatEuro(wait.paymentAfter, 2)}`;
@@ -430,8 +423,8 @@ function render() {
     : (currentLanguage === "sk" ? "Anuitný odhad" : "Annuity estimate");
   document.querySelector("#maturity-helper").textContent = message("maturityRemaining", formatRemainingMonths(values.totalMonths));
   document.querySelector("#fixation-helper").textContent = message("fixationRemaining", pluralMonths(values.monthsToFix));
-  document.querySelector("#scenario-now-row").classList.toggle("is-cheaper", outcome === "now");
-  document.querySelector("#scenario-wait-row").classList.toggle("is-cheaper", outcome === "wait");
+  document.querySelector("#scenario-now-row").classList.remove("is-cheaper");
+  document.querySelector("#scenario-wait-row").classList.remove("is-cheaper");
   document.querySelector("#now-paid").textContent = formatEuro(now.paid);
   document.querySelector("#wait-paid").textContent = formatEuro(wait.paid);
   document.querySelector("#now-principal-paid").textContent = formatEuro(values.balance - now.balance);
