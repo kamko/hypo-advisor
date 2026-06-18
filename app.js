@@ -192,6 +192,12 @@ function applyLanguage() {
   document.querySelectorAll("[data-language]").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.language === currentLanguage));
   });
+  document.querySelectorAll("[data-number]").forEach((input) => {
+    const value = parseLocalizedNumber(input.value);
+    if (Number.isFinite(value)) {
+      input.value = String(value).replace(".", currentLanguage === "sk" ? "," : ".");
+    }
+  });
   document.querySelector("#currentPayment").placeholder = currentLanguage === "sk" ? "Vypočítame" : "Calculated automatically";
 }
 
@@ -264,13 +270,36 @@ function findBreakEven(values, targetCost) {
 }
 
 function getValues() {
-  const values = Object.fromEntries(inputs.map((input) => [
-    input.name,
-    input.type === "date" ? input.value : input.value === "" ? null : Number(input.value),
-  ]));
+  const values = Object.fromEntries(inputs.map((input) => {
+    if (input.dataset.number !== undefined) {
+      const value = parseLocalizedNumber(input.value);
+      const min = input.dataset.min === undefined ? -Infinity : Number(input.dataset.min);
+      const max = input.dataset.max === undefined ? Infinity : Number(input.dataset.max);
+      const valid = value === null ? !input.required : Number.isFinite(value) && value >= min && value <= max;
+      input.setCustomValidity(valid ? "" : "invalid");
+      return [input.name, value];
+    }
+    return [input.name, input.type === "date" ? input.value : input.value === "" ? null : Number(input.value)];
+  }));
   values.totalMonths = monthsUntil(values.maturityDate);
   values.monthsToFix = monthsUntil(values.fixationEndDate);
   return values;
+}
+
+function parseLocalizedNumber(rawValue) {
+  let value = String(rawValue ?? "").trim().replace(/[\s\u00a0]/gu, "");
+  if (!value) return null;
+  if (!/^[+-]?[0-9.,]+$/u.test(value)) return Number.NaN;
+
+  const comma = value.lastIndexOf(",");
+  const dot = value.lastIndexOf(".");
+  const decimalIndex = Math.max(comma, dot);
+  if (decimalIndex >= 0) {
+    const integerPart = value.slice(0, decimalIndex).replace(/[.,]/gu, "");
+    const decimalPart = value.slice(decimalIndex + 1).replace(/[.,]/gu, "");
+    value = `${integerPart}.${decimalPart}`;
+  }
+  return Number(value);
 }
 
 function parseLocalDate(value) {

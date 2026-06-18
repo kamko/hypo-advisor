@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&amp;display=swap&amp;subset=latin-ext" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css?v=11" />
-    <script src="app.js?v=10" defer></script>
+    <script src="app.js?v=11" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -52,7 +52,7 @@
               <div class="field-grid">
                 <label class="field">
                   <span data-i18n="balance">Zostatok hypotéky</span>
-                  <span class="input-shell"><input id="balance" name="balance" type="number" min="1000" step="0.01" inputmode="decimal" value="120000" required /><span>€</span></span>
+                  <span class="input-shell"><input id="balance" name="balance" type="text" inputmode="decimal" data-number data-min="1000" value="120000" required /><span>€</span></span>
                 </label>
                 <label class="field">
                   <span data-i18n="maturityDate">Dátum konečnej splatnosti</span>
@@ -61,11 +61,11 @@
                 </label>
                 <label class="field">
                   <span data-i18n="currentRate">Aktuálna úroková sadzba</span>
-                  <span class="input-shell"><input id="currentRate" name="currentRate" type="number" min="0" max="20" step="0.01" inputmode="decimal" value="1.49" required /><span>%</span></span>
+                  <span class="input-shell"><input id="currentRate" name="currentRate" type="text" inputmode="decimal" data-number data-min="0" data-max="20" value="1.49" required /><span>%</span></span>
                 </label>
                 <label class="field">
                   <span data-i18n="currentPayment">Aktuálna mesačná splátka</span>
-                  <span class="input-shell"><input id="currentPayment" name="currentPayment" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Vypočítame" /><span>€</span></span>
+                  <span class="input-shell"><input id="currentPayment" name="currentPayment" type="text" inputmode="decimal" data-number data-min="0.01" placeholder="Vypočítame" /><span>€</span></span>
                   <small data-i18n="currentPaymentHelp">Pravidelná splátka určená bankou, bez mimoriadnych splátok. Prázdne pole použije náš odhad.</small>
                 </label>
                 <label class="field">
@@ -88,15 +88,15 @@
               <div class="field-grid">
                 <label class="field">
                   <span data-i18n="rateNow">Sadzba pri refixácii dnes</span>
-                  <span class="input-shell"><input id="rateNow" name="rateNow" type="number" min="0" max="20" step="0.01" inputmode="decimal" value="3.89" required /><span>%</span></span>
+                  <span class="input-shell"><input id="rateNow" name="rateNow" type="text" inputmode="decimal" data-number data-min="0" data-max="20" value="3.89" required /><span>%</span></span>
                 </label>
                 <label class="field">
                   <span data-i18n="futureRate">Očakávaná sadzba po fixácii</span>
-                  <span class="input-shell"><input id="futureRate" name="futureRate" type="number" min="0" max="20" step="0.01" inputmode="decimal" value="3.49" required /><span>%</span></span>
+                  <span class="input-shell"><input id="futureRate" name="futureRate" type="text" inputmode="decimal" data-number data-min="0" data-max="20" value="3.49" required /><span>%</span></span>
                 </label>
                 <label class="field">
                   <span data-i18n="switchCost">Náklady na zmenu dnes</span>
-                  <span class="input-shell"><input id="switchCost" name="switchCost" type="number" min="0" step="0.01" inputmode="decimal" value="0" required /><span>€</span></span>
+                  <span class="input-shell"><input id="switchCost" name="switchCost" type="text" inputmode="decimal" data-number data-min="0" value="0" required /><span>€</span></span>
                   <small data-i18n="switchCostHelp">Napr. poplatok banke alebo za znalecký posudok.</small>
                 </label>
                 <label class="field">
