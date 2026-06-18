@@ -359,10 +359,15 @@ h1 {
   display: block;
   max-width: 25ch;
   font-size: 22px;
-  line-height: 1.25;
-  letter-spacing: -0.025em;
+  line-height: 1.38;
+  letter-spacing: -0.012em;
+  padding-top: 2px;
   text-wrap: balance;
 }
+
+#cost-headline em { font-style: normal; white-space: nowrap; }
+#cost-headline .is-wait { color: oklch(0.39 0.12 175); }
+#cost-headline .is-now { color: var(--primary); }
 
 .tradeoff-list { margin-top: 20px; border-top: 1px solid var(--line); }
 
@@ -382,6 +387,9 @@ h1 {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+.tradeoff-list .is-positive { color: oklch(0.39 0.12 175); }
+.tradeoff-list .is-tradeoff { color: oklch(0.48 0.13 55); }
 
 .difference-block > p:last-child {
   margin: 13px 0 0;

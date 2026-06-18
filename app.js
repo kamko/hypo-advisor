@@ -446,15 +446,30 @@ function render() {
         ? `Za najbližšie ${values.horizonYears} roky`
         : `Za najbližších ${values.horizonYears} rokov`)
     : `Over the next ${duration}`;
-  document.querySelector("#cost-headline").textContent = costAdvantage < 0.5
-    ? (currentLanguage === "sk" ? "Oba scenáre majú rovnaké úroky a poplatky." : "Both scenarios have the same interest and fees.")
-    : (currentLanguage === "sk"
-      ? `${subjectName} ušetrí ${formatEuro(costAdvantage)} na úrokoch a poplatkoch.`
-      : `${subjectName} saves ${formatEuro(costAdvantage)} in interest and fees.`);
+  const headlineSubject = document.querySelector("#headline-subject");
+  const headlineAction = document.querySelector("#headline-action");
+  const headlineAmount = document.querySelector("#headline-amount");
+  const headlineRest = document.querySelector("#headline-rest");
+  headlineSubject.className = costAdvantage < 0.5 ? "" : (waitHasLowerCost ? "is-wait" : "is-now");
+  headlineAmount.className = "";
+  if (costAdvantage < 0.5) {
+    headlineSubject.textContent = currentLanguage === "sk" ? "Oba scenáre majú rovnaké úroky a poplatky." : "Both scenarios have the same interest and fees.";
+    headlineAction.textContent = "";
+    headlineAmount.textContent = "";
+    headlineRest.textContent = "";
+  } else {
+    headlineSubject.textContent = subjectName;
+    headlineAction.textContent = currentLanguage === "sk" ? "ušetrí" : "saves";
+    headlineAmount.textContent = formatEuro(costAdvantage);
+    headlineAmount.className = waitHasLowerCost ? "is-wait" : "is-now";
+    headlineRest.textContent = currentLanguage === "sk" ? "na úrokoch a poplatkoch." : "in interest and fees.";
+  }
   document.querySelector("#cashflow-label").textContent = currentLanguage === "sk" ? "Z účtu odíde" : "Cash outflow is";
   document.querySelector("#cashflow-detail").textContent = `${currentLanguage === "sk" ? "o " : ""}${formatEuro(Math.abs(cashAdvantage))} ${cashWord}`;
+  document.querySelector("#cashflow-detail").className = cashAdvantage >= 0 ? "is-positive" : "is-tradeoff";
   document.querySelector("#balance-label").textContent = currentLanguage === "sk" ? "Zostávajúci dlh bude" : "Outstanding balance is";
   document.querySelector("#balance-detail").textContent = `${currentLanguage === "sk" ? "o " : ""}${formatEuro(Math.abs(balanceAdvantage))} ${balanceWord}`;
+  document.querySelector("#balance-detail").className = balanceAdvantage >= 0 ? "is-positive" : "is-tradeoff";
 
   const connector = cashAdvantage >= 0 && balanceAdvantage >= 0
     ? " + "
