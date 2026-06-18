@@ -440,8 +440,12 @@ function render() {
     : (balanceAdvantage >= 0 ? "lower" : "higher");
 
   document.querySelector("#difference-label").textContent = currentLanguage === "sk"
-    ? `Po ${values.horizonYears} ${values.horizonYears === 1 ? "roku" : "rokoch"}`
-    : `After ${duration}`;
+    ? (values.horizonYears === 1
+      ? "Za najbližší rok"
+      : values.horizonYears < 5
+        ? `Za najbližšie ${values.horizonYears} roky`
+        : `Za najbližších ${values.horizonYears} rokov`)
+    : `Over the next ${duration}`;
   document.querySelector("#cost-headline").textContent = costAdvantage < 0.5
     ? (currentLanguage === "sk" ? "Oba scenáre majú rovnaké úroky a poplatky." : "Both scenarios have the same interest and fees.")
     : (currentLanguage === "sk"
