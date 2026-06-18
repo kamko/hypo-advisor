@@ -49,7 +49,7 @@ const englishCopy = {
   yearsSuffix: "years",
   comparison: "Comparison",
   saved: "Saved locally",
-  copyLink: "Copy share link",
+  copyLink: "Copy link to this scenario",
   result: "Comparison result",
   by: "by",
   scenario: "Scenario",

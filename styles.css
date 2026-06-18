@@ -304,17 +304,23 @@ h1 {
 }
 
 #copy-link {
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid currentColor;
-  background: transparent;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
   color: var(--primary);
   cursor: pointer;
   font-size: 11px;
   font-weight: 700;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease);
 }
 
-#copy-link:hover { color: var(--primary-hover); }
+#copy-link:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
 
 .error-message {
   margin-top: 20px;
@@ -572,7 +578,8 @@ footer p { margin: 0; }
   .section-heading p { margin: 12px 0 0 38px; }
   .field-grid { grid-template-columns: 1fr; gap: 18px; }
   .results { margin-inline: -14px; padding: 24px 18px; border-radius: 0; }
-  .results-title-row { align-items: flex-start; }
+  .results-title-row { align-items: flex-start; flex-direction: column; }
+  .result-actions { align-items: flex-start; }
   .scenario-row { grid-template-columns: minmax(100px, 1fr) 98px 86px; font-size: 12px; }
   .balance-row { grid-template-columns: minmax(110px, 1fr) 80px 80px; }
   .break-even { grid-template-columns: 100px 1fr; }
