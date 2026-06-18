@@ -509,6 +509,69 @@ details { padding-top: 20px; }
 summary { cursor: pointer; color: var(--primary); font-size: 12px; font-weight: 700; }
 details p { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
 
+.calculation-doc {
+  margin-top: 16px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.calculation-doc h3 {
+  margin: 22px 0 8px;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+}
+
+.calculation-doc p,
+.calculation-doc li,
+.calculation-doc dd {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.calculation-doc dl {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 5px 10px;
+  margin: 10px 0 0;
+}
+
+.calculation-doc dt { font-size: 12px; font-weight: 750; }
+.calculation-doc dd { margin: 0; }
+.calculation-doc ol,
+.calculation-doc ul { margin: 8px 0 0; padding-left: 20px; }
+.calculation-doc li + li { margin-top: 7px; }
+
+.formula {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.fraction { display: inline-flex; flex-direction: column; text-align: center; }
+.fraction > span:first-child { padding: 0 4px 3px; border-bottom: 1px solid currentColor; }
+.fraction > span:last-child { padding-top: 3px; }
+
+.formula-stack {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow-x: auto;
+}
+
+.formula-stack code { color: var(--ink); font-size: 11px; white-space: nowrap; }
+
 .variants { padding: 76px 0 60px; border-top: 1px solid var(--line); }
 
 .variants-heading { display: flex; justify-content: space-between; margin-bottom: 24px; }

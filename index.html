@@ -7,7 +7,7 @@
     <title>Hypo Advisor</title>
     <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=2" />
-    <script src="app.js?v=5" defer></script>
+    <script src="app.js?v=6" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -189,7 +189,50 @@
 
               <details>
                 <summary data-i18n="calculationTitle">Ako to počítame</summary>
-                <p data-i18n="calculationHelp">Pri čakaní počítame dnešnú splátku až do konca fixácie a potom novú splátku. Pri refixácii dnes počítame novú splátku odteraz. Každú splátku rozdelíme na úrok a istinu. Iba istina znižuje zostávajúci dlh.</p>
+                <div class="calculation-doc">
+                  <p data-i18n="calcIntro">Používame štandardný anuitný model s mesačným úročením. Výpočet prebieha bez priebežného zaokrúhľovania.</p>
+
+                  <h3 data-i18n="calcVariables">Premenné</h3>
+                  <dl>
+                    <dt><var>P</var></dt><dd data-i18n="varPrincipal">aktuálny zostatok istiny</dd>
+                    <dt><var>r</var></dt><dd data-i18n="varRate">mesačná sadzba = ročná sadzba / 100 / 12</dd>
+                    <dt><var>n</var></dt><dd data-i18n="varTerm">počet mesiacov do konečnej splatnosti</dd>
+                    <dt><var>k</var></dt><dd data-i18n="varFixation">počet mesiacov do konca aktuálnej fixácie</dd>
+                    <dt><var>h</var></dt><dd data-i18n="varHorizon">horizont porovnania v mesiacoch</dd>
+                  </dl>
+
+                  <h3 data-i18n="calcPayment">Anuitná splátka</h3>
+                  <div class="formula"><var>M</var> = <var>P</var> × <span class="fraction"><span><var>r</var>(1 + <var>r</var>)<sup>n</sup></span><span>(1 + <var>r</var>)<sup>n</sup> − 1</span></span></div>
+                  <p data-i18n="calcZeroRate">Pri nulovej sadzbe použijeme M = P / n.</p>
+
+                  <h3 data-i18n="calcMonthly">Každý mesiac</h3>
+                  <div class="formula-stack">
+                    <code>I<sub>t</sub> = B<sub>t−1</sub> × r</code>
+                    <code>A<sub>t</sub> = min(M − I<sub>t</sub>, B<sub>t−1</sub>)</code>
+                    <code>B<sub>t</sub> = max(0, B<sub>t−1</sub> − A<sub>t</sub>)</code>
+                  </div>
+                  <p data-i18n="calcMonthlyHelp">I je úrok, A splatená istina a B zostávajúci dlh. Ak zadáte aktuálnu splátku z banky, počas prvých k mesiacov použijeme ju namiesto vypočítanej M.</p>
+
+                  <h3 data-i18n="calcScenarios">Scenáre</h3>
+                  <ol>
+                    <li data-i18n="calcNow"><strong>Refixovať dnes:</strong> novú splátku vypočítame zo zostatku P, sadzby dostupnej dnes a zostávajúcich n mesiacov. Simulujeme min(h, n) mesiacov.</li>
+                    <li data-i18n="calcWait"><strong>Počkať:</strong> prvých k mesiacov použijeme aktuálnu sadzbu a aktuálnu splátku. Zo zostatku Bₖ potom vypočítame novú splátku pri očakávanej sadzbe na zostávajúcich n − k mesiacov.</li>
+                  </ol>
+
+                  <h3 data-i18n="calcOutputs">Výstupy</h3>
+                  <ul>
+                    <li data-i18n="calcOutflow"><strong>Spolu odíde z účtu</strong> = súčet všetkých splátok v horizonte + náklady na zmenu dnes.</li>
+                    <li data-i18n="calcCost"><strong>Úroky a poplatky</strong> = súčet Iₜ + náklady na zmenu dnes. Splatená istina nie je náklad.</li>
+                    <li data-i18n="calcPrincipal"><strong>Splatená istina</strong> = P − Bₕ.</li>
+                    <li data-i18n="calcBalance"><strong>Zostatok po horizonte</strong> = Bₕ.</li>
+                  </ul>
+
+                  <h3 data-i18n="calcBreakEven">Hraničná sadzba</h3>
+                  <p data-i18n="calcBreakEvenHelp">Binárnym hľadaním medzi 0 % a 20 % hľadáme budúcu sadzbu, pri ktorej sú úroky a poplatky oboch scenárov rovnaké.</p>
+
+                  <h3 data-i18n="calcDates">Dátumy a zaokrúhľovanie</h3>
+                  <p data-i18n="calcDatesHelp">Počet splátok odvodíme z kalendárnych mesiacov medzi dneškom a zadaným dátumom; neúplný posledný mesiac počítame ako ďalšiu splátku. Splátky zobrazujeme na centy a súhrny na celé eurá, ale počítame s plnou presnosťou. Banka môže použiť denné úročenie a vlastné pravidlá zaokrúhľovania.</p>
+                </div>
               </details>
             </div>
           </aside>
