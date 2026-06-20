@@ -37,7 +37,19 @@
         <p data-i18n="intro">Porovnajte si obe možnosti na rovnakom časovom horizonte. Bez registrácie a bez odporúčania, ktoré by skrývalo predpoklady.</p>
       </section>
 
-      <form id="mortgage-form" novalidate>
+      <nav class="decision-nav" aria-labelledby="decision-nav-heading">
+        <div>
+          <h2 id="decision-nav-heading" data-i18n="decisionType">Čo chcete prepočítať?</h2>
+          <p data-i18n="decisionTypeHelp">Každý výpočet používa vlastné predpoklady a všetky údaje zostávajú v prehliadači.</p>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Typ porovnania">
+          <button id="tab-fixation" type="button" role="tab" aria-selected="true" aria-controls="panel-fixation" data-mode="fixation" data-i18n="fixationEndTab">Koniec fixácie</button>
+          <button id="tab-consolidation" type="button" role="tab" aria-selected="false" aria-controls="panel-consolidation" data-mode="consolidation" data-i18n="consolidationTab">Konsolidácia úverov</button>
+          <button id="tab-stress" type="button" role="tab" aria-selected="false" aria-controls="panel-stress" data-mode="stress" data-i18n="stressTab">Stres test splátky</button>
+        </div>
+      </nav>
+
+      <form id="mortgage-form" class="decision-panel" role="tabpanel" aria-labelledby="tab-fixation" data-panel="fixation" novalidate>
         <div class="workspace">
           <div class="inputs-column">
             <section class="form-section" aria-labelledby="mortgage-heading">
@@ -249,19 +261,89 @@
         </div>
       </form>
 
-      <section class="variants" aria-labelledby="variants-heading">
-        <div class="variants-heading">
-          <div>
-            <h2 id="variants-heading" data-i18n="otherDecisions">Ďalšie rozhodnutia</h2>
-            <p data-i18n="otherDecisionsHelp">Postupne sem pribudnú ďalšie situácie okolo hypotéky.</p>
+      <form id="consolidation-form" class="decision-panel" role="tabpanel" aria-labelledby="tab-consolidation" data-panel="consolidation" hidden novalidate>
+        <div class="workspace">
+          <div class="inputs-column">
+            <section class="form-section" aria-labelledby="consolidation-loans-heading">
+              <div class="section-heading">
+                <div><span class="step">1</span><h2 id="consolidation-loans-heading" data-i18n="currentLoans">Dnešné úvery</h2></div>
+                <p data-i18n="currentLoansHelp">Porovnávame rovnaký dlh, ale inú sadzbu a dobu splácania.</p>
+              </div>
+              <div id="loan-list" class="loan-list"></div>
+              <button id="add-loan" class="secondary-action" type="button"><span aria-hidden="true">+</span> <span data-i18n="addLoan">Pridať ďalší úver</span></button>
+              <template id="loan-row-template">
+                <div class="loan-row" role="group">
+                  <div class="loan-row-header"><strong class="loan-number"></strong><button class="remove-loan" type="button"></button></div>
+                  <label class="field"><span data-i18n="loanBalance">Zostatok</span><span class="input-shell"><input class="loan-balance" type="number" min="100" step="100" required><span>€</span></span></label>
+                  <label class="field"><span data-i18n="loanRate">Úroková sadzba</span><span class="input-shell"><input class="loan-rate" type="number" min="0" max="30" step="0.01" required><span>%</span></span></label>
+                  <label class="field"><span data-i18n="loanTerm">Zostávajúca splatnosť</span><span class="input-shell"><input class="loan-months" type="number" min="1" max="480" step="1" required><span data-i18n="monthsSuffix">mes.</span></span></label>
+                </div>
+              </template>
+            </section>
+            <section class="form-section" aria-labelledby="consolidation-offer-heading">
+              <div class="section-heading">
+                <div><span class="step">2</span><h2 id="consolidation-offer-heading" data-i18n="consolidationOffer">Ponuka na konsolidáciu</h2></div>
+                <p data-i18n="consolidationOfferHelp">Celý dlh sa rozloží na zvolenú dobu. Dlhšia splatnosť môže znížiť splátku, ale zvýšiť úroky.</p>
+              </div>
+              <div class="field-grid">
+                <label class="field"><span data-i18n="consolidationRate">Nová úroková sadzba</span><span class="input-shell"><input id="conNewRate" type="number" min="0" max="20" step="0.01" value="4.1" required><span>%</span></span></label>
+                <label class="field"><span data-i18n="consolidationTerm">Nová doba splatnosti</span><span class="input-shell"><input id="conNewYears" type="number" min="1" max="40" step="1" value="22" required><span data-i18n="yearsSuffix">rokov</span></span></label>
+                <label class="field"><span data-i18n="consolidationFees">Jednorazové poplatky</span><span class="input-shell"><input id="conFees" type="number" min="0" step="10" value="300" required><span>€</span></span></label>
+              </div>
+            </section>
           </div>
+          <aside class="results compact-results" aria-labelledby="consolidation-results-heading" aria-live="polite">
+            <div class="results-title-row"><div><span class="step">3</span><h2 id="consolidation-results-heading" data-i18n="comparison">Porovnanie</h2></div></div>
+            <div id="consolidation-error" class="error-message" role="alert" hidden></div>
+            <div id="consolidation-results">
+              <div class="difference-block"><p data-i18n="monthlyRelief">Zmena mesačnej splátky</p><strong id="conHeadline">—</strong><p id="conSummary">—</p></div>
+              <div class="scenario-table result-grid" role="table" aria-label="Porovnanie konsolidácie">
+                <div class="scenario-row scenario-head" role="row"><span role="columnheader" data-i18n="scenario">Scenár</span><span role="columnheader" data-i18n="payment">Splátka</span><span role="columnheader" data-i18n="totalInterestFees">Úroky + poplatky celkom</span></div>
+                <div class="scenario-row" role="row"><span role="cell" data-i18n="keepSeparate">Úvery oddelene</span><strong id="conSeparatePayment" role="cell">—</strong><strong id="conSeparateCost" role="cell">—</strong></div>
+                <div class="scenario-row" role="row"><span role="cell" data-i18n="combineLoans">Spojiť do hypotéky</span><strong id="conCombinedPayment" role="cell">—</strong><strong id="conCombinedCost" role="cell">—</strong></div>
+              </div>
+              <div class="insight-list">
+                <div><span data-i18n="monthlyDifference">Rozdiel mesačne</span><strong id="conMonthlyDifference">—</strong></div>
+                <div><span data-i18n="costDifference">Rozdiel celkových nákladov</span><strong id="conCostDifference">—</strong></div>
+                <div><span data-i18n="debtFreeDifference">Rozdiel doby splácania</span><strong id="conTermDifference">—</strong></div>
+              </div>
+              <details><summary data-i18n="calculationTitle">Ako to počítame</summary><p data-i18n="consolidationMethod">Používame anuitné splácanie. Pri oddelených úveroch sčítame obe dnešné splátky a všetky budúce úroky. Pri konsolidácii sčítame istiny, použijeme novú sadzbu a splatnosť a pripočítame poplatky.</p></details>
+            </div>
+          </aside>
         </div>
-        <div class="tabs" role="tablist" aria-label="Typ porovnania">
-          <button type="button" role="tab" aria-selected="true" data-i18n="fixationEndTab">Koniec fixácie</button>
-          <button type="button" role="tab" aria-selected="false" disabled><span class="tab-label" data-i18n="mortgageIncrease">Navýšenie hypotéky</span> <span class="soon" data-i18n="later">Neskôr</span></button>
-          <button type="button" role="tab" aria-selected="false" disabled><span class="tab-label" data-i18n="mortgageInvestment">Hypotéka alebo investícia</span> <span class="soon" data-i18n="later">Neskôr</span></button>
+      </form>
+
+      <form id="stress-form" class="decision-panel" role="tabpanel" aria-labelledby="tab-stress" data-panel="stress" hidden novalidate>
+        <div class="workspace">
+          <div class="inputs-column">
+            <section class="form-section" aria-labelledby="stress-inputs-heading">
+              <div class="section-heading">
+                <div><span class="step">1</span><h2 id="stress-inputs-heading" data-i18n="stressInputs">Hypotéka a rozpočet</h2></div>
+                <p data-i18n="stressInputsHelp">Neodhadujeme budúcnosť. Ukazujeme, čo by s rozpočtom spravili vyššie sadzby.</p>
+              </div>
+              <div class="field-grid">
+                <label class="field"><span data-i18n="mortgageBalance">Zostatok hypotéky</span><span class="input-shell"><input id="stressBalance" type="number" min="1000" step="100" value="120000" required><span>€</span></span></label>
+                <label class="field"><span data-i18n="mortgageTerm">Zostávajúca splatnosť hypotéky</span><span class="input-shell"><input id="stressYears" type="number" min="1" max="40" step="1" value="22" required><span data-i18n="yearsSuffix">rokov</span></span></label>
+                <label class="field"><span data-i18n="referenceRate">Východisková sadzba</span><span class="input-shell"><input id="stressRate" type="number" min="0" max="20" step="0.01" value="3.89" required><span>%</span></span></label>
+                <label class="field"><span data-i18n="householdIncome">Čistý mesačný príjem domácnosti</span><span class="input-shell"><input id="stressIncome" type="number" min="50" step="50" value="2400" required><span>€</span></span><small data-i18n="incomeHelp">Používame ho iba na zobrazenie podielu splátky na príjme.</small></label>
+              </div>
+            </section>
+          </div>
+          <aside class="results compact-results" aria-labelledby="stress-results-heading" aria-live="polite">
+            <div class="results-title-row"><div><span class="step">2</span><h2 id="stress-results-heading" data-i18n="stressResult">Odolnosť splátky</h2></div></div>
+            <div id="stress-error" class="error-message" role="alert" hidden></div>
+            <div id="stress-results">
+              <div class="difference-block"><p data-i18n="highestScenario">Pri najvyššom scenári</p><strong id="stressHeadline">—</strong><p id="stressSummary">—</p></div>
+              <div class="stress-table" role="table" aria-label="Stres test úrokovej sadzby">
+                <div class="stress-row stress-head" role="row"><span role="columnheader" data-i18n="rate">Sadzba</span><span role="columnheader" data-i18n="payment">Splátka</span><span role="columnheader" data-i18n="paymentChange">Zmena</span><span role="columnheader" data-i18n="incomeShare">Z príjmu</span></div>
+                <div id="stressRows"></div>
+              </div>
+              <div class="stress-note"><strong data-i18n="stressNoteTitle">Ako čítať výsledok</strong><p data-i18n="stressNote">Podiel splátky na príjme nie je schválenie banky ani univerzálna hranica bezpečia. Nezahŕňa ostatné výdavky, úvery ani finančnú rezervu domácnosti.</p></div>
+              <details><summary data-i18n="calculationTitle">Ako to počítame</summary><p data-i18n="stressMethod">Pre každú sadzbu prepočítame novú anuitnú splátku pri rovnakom zostatku a zostávajúcej splatnosti. Scenáre sú východisková sadzba, potom +1, +2 a +3 percentuálne body.</p></details>
+            </div>
+          </aside>
         </div>
-      </section>
+      </form>
     </main>
 
     <footer>
