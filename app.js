@@ -161,6 +161,9 @@ const englishCopy = {
   referenceRate: "Starting interest rate",
   householdIncome: "Household net monthly income",
   incomeHelp: "We use it only to show the payment as a share of income.",
+  scenarioCount: "Number of scenarios",
+  variantsSuffix: "variants",
+  scenarioCountHelp: "Including the starting rate; each additional scenario adds 1 percentage point.",
   stressResult: "Payment resilience",
   highestScenario: "At the highest scenario",
   rate: "Rate",
@@ -168,12 +171,12 @@ const englishCopy = {
   incomeShare: "Of income",
   stressNoteTitle: "How to read the result",
   stressNote: "The share of income is neither bank approval nor a universal safety limit. It excludes other expenses, loans and the household's financial reserve.",
-  stressMethod: "For each rate, we recalculate the annuity payment using the same balance and remaining term. The scenarios are the starting rate, then +1, +2 and +3 percentage points.",
+  stressMethod: "For each rate, we recalculate the annuity payment using the same balance and remaining term. Each additional scenario adds 1 percentage point.",
   stressCalcIntro: "For every scenario, the balance and remaining term stay unchanged. Only the annual interest rate changes.",
   stressVarIncome: "entered household net monthly income",
   stressCalcScenarios: "Rate scenarios",
   stressCalcZeroRate: "At a zero rate, we use M = B / n.",
-  stressCalcScenariosHelp: "We calculate payments for a, a + 1, a + 2 and a + 3 percentage points. These are sensitivity scenarios, not a rate forecast.",
+  stressCalcScenariosHelp: "We start at rate a; each additional scenario adds 1 percentage point. These are sensitivity scenarios, not a rate forecast.",
   stressCalcOutputs: "Displayed differences",
   stressCalcOutputsHelp: "Payment change is Mⱼ − M₀. Income share is Mⱼ / D × 100. It does not include other household expenses or debts.",
   mortgageBalance: "Outstanding mortgage balance",
@@ -778,6 +781,7 @@ function encodeDecisionUrlState(state) {
       number(state.stress.years),
       number(state.stress.rate, 100),
       number(state.stress.income, 100),
+      number(state.stress.variantCount),
     ].join("_");
     return `${DECISION_URL_STATE_VERSION}.s.${language}.${stress}`;
   }
@@ -811,13 +815,14 @@ function decodeDecisionUrlState() {
       if (mode === "stress") {
         if (parts.length !== 4) return null;
         const values = parts[3].split("_");
-        if (values.length !== 4) return null;
+        if (![4, 5].includes(values.length)) return null;
         const balance = number(values[0], 100);
         const years = number(values[1]);
         const rate = number(values[2], 100);
         const income = number(values[3], 100);
-        if (!finite(balance, 1000, 100000000) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(rate, 0, 20) || !finite(income, 50, 10000000)) return null;
-        return { activeDecisionMode: mode, language, stress: { balance, years, rate, income } };
+        const variantCount = values.length === 5 ? number(values[4]) : 4;
+        if (!finite(balance, 1000, 100000000) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(rate, 0, 20) || !finite(income, 50, 10000000) || !Number.isInteger(variantCount) || !finite(variantCount, 3, 6)) return null;
+        return { activeDecisionMode: mode, language, stress: { balance, years, rate, income, variantCount } };
       }
       if (parts.length !== 5) return null;
       const loanParts = parts[3].split("~");
@@ -882,6 +887,7 @@ function saveDecisionState() {
       years: Number(document.querySelector("#stressYears").value),
       rate: readToolNumber(document.querySelector("#stressRate")),
       income: readToolNumber(document.querySelector("#stressIncome")),
+      variantCount: Number(document.querySelector("#stressVariantCount").value),
     },
   };
   localStorage.setItem(DECISIONS_STORAGE_KEY, JSON.stringify(state));
@@ -1126,8 +1132,9 @@ function renderStressTest() {
   const months = Number(document.querySelector("#stressYears").value) * 12;
   const baseRate = readToolNumber(document.querySelector("#stressRate"));
   const income = readToolNumber(document.querySelector("#stressIncome"));
+  const variantCount = Number(document.querySelector("#stressVariantCount").value);
 
-  if (!formElement.checkValidity() || balance < 1000 || months < 1 || baseRate < 0 || income <= 0) {
+  if (!formElement.checkValidity() || balance < 1000 || months < 1 || baseRate < 0 || income <= 0 || !Number.isInteger(variantCount) || variantCount < 3 || variantCount > 6) {
     error.textContent = currentLanguage === "sk" ? "Skontrolujte hodnoty hypotéky a príjmu." : "Check the mortgage and income values.";
     error.hidden = false;
     content.hidden = true;
@@ -1136,7 +1143,7 @@ function renderStressTest() {
 
   error.hidden = true;
   content.hidden = false;
-  const scenarios = [0, 1, 2, 3].map((increase) => {
+  const scenarios = Array.from({ length: variantCount }, (_, increase) => {
     const rate = baseRate + increase;
     const payment = monthlyPayment(balance, rate, months);
     return { increase, rate, payment, share: payment / income * 100 };
@@ -1171,12 +1178,12 @@ function setDecisionMode(mode, shouldFocus = true) {
     sk: {
       fixation: ["Rozhodovanie pred koncom fixácie", "Refixovať skôr alebo počkať?", "Porovnajte si obe možnosti na rovnakom časovom horizonte. Bez registrácie a bez odporúčania, ktoré by skrývalo predpoklady."],
       consolidation: ["Viac úverov, jedno rozhodnutie", "Spojiť úvery do jednej hypotéky?", "Porovnajte súčet dnešných splátok a úrokov s jednou konsolidačnou ponukou. Nižšia splátka nemusí znamenať nižšie náklady."],
-      stress: ["Rezerva pre horší vývoj", "Čo spraví vyššia sadzba so splátkou?", "Pozrite si štyri sadzobné scenáre pri rovnakom dlhu a splatnosti. Nejde o predpoveď, ale o skúšku odolnosti rozpočtu."],
+      stress: ["Rezerva pre horší vývoj", "Čo spraví vyššia sadzba so splátkou?", "Porovnajte si viac sadzobných scenárov pri rovnakom dlhu a splatnosti. Nejde o predpoveď, ale o skúšku odolnosti rozpočtu."],
     },
     en: {
       fixation: ["Decision before the fixed-rate period ends", "Refix earlier or wait?", "Compare both options over the same time horizon. No registration and no recommendation that hides its assumptions."],
       consolidation: ["Several loans, one decision", "Combine loans into one mortgage?", "Compare today's total payments and interest with one consolidation offer. A lower payment may not mean a lower total cost."],
-      stress: ["A buffer for a worse outcome", "What would a higher rate do to your payment?", "See four rate scenarios for the same debt and term. This is not a forecast, but a resilience check for the household budget."],
+      stress: ["A buffer for a worse outcome", "What would a higher rate do to your payment?", "Compare several rate scenarios for the same debt and term. This is not a forecast, but a resilience check for the household budget."],
     },
   }[currentLanguage][mode];
   document.querySelector(".context-label").textContent = copy[0];
@@ -1200,6 +1207,7 @@ function resetDecisionTools() {
   document.querySelector("#stressYears").value = 22;
   document.querySelector("#stressRate").value = editableNumber(3.89);
   document.querySelector("#stressIncome").value = 2400;
+  document.querySelector("#stressVariantCount").value = 4;
   setDecisionMode("fixation", false);
   renderConsolidation();
   renderStressTest();
@@ -1220,6 +1228,7 @@ function initializeDecisionTools() {
     document.querySelector("#stressYears").value = state.stress.years;
     document.querySelector("#stressRate").value = editableNumber(state.stress.rate);
     document.querySelector("#stressIncome").value = editableNumber(state.stress.income);
+    document.querySelector("#stressVariantCount").value = state.stress.variantCount ?? 4;
   }
   document.querySelector("#add-loan").addEventListener("click", () => {
     addLoan();

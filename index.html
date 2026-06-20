@@ -9,8 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&amp;display=swap&amp;subset=latin-ext" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=11" />
-    <script src="app.js?v=12" defer></script>
+    <link rel="stylesheet" href="styles.css?v=12" />
+    <script src="app.js?v=13" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -381,6 +381,7 @@
                 <label class="field"><span data-i18n="mortgageTerm">Zostávajúca splatnosť hypotéky</span><span class="input-shell"><input id="stressYears" type="number" min="1" max="40" step="1" value="22" required><span data-i18n="yearsSuffix">rokov</span></span></label>
                 <label class="field"><span data-i18n="referenceRate">Východisková sadzba</span><span class="input-shell"><input id="stressRate" type="text" inputmode="decimal" data-number data-min="0" data-max="20" value="3.89" required><span>%</span></span></label>
                 <label class="field"><span data-i18n="householdIncome">Čistý mesačný príjem domácnosti</span><span class="input-shell"><input id="stressIncome" type="text" inputmode="decimal" data-number data-min="50" value="2400" required><span>€</span></span><small data-i18n="incomeHelp">Používame ho iba na zobrazenie podielu splátky na príjme.</small></label>
+                <label class="field"><span data-i18n="scenarioCount">Počet scenárov</span><span class="input-shell select-shell"><select id="stressVariantCount"><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option></select><span data-i18n="variantsSuffix">variantov</span></span><small data-i18n="scenarioCountHelp">Vrátane východiskovej sadzby; každý ďalší scenár pridá +1 percentuálny bod.</small></label>
               </div>
             </section>
           </div>
@@ -412,7 +413,7 @@
                   <div class="formula"><var>Mⱼ</var> = <var>B</var> × <span class="fraction"><span><var>rⱼ</var>(1 + <var>rⱼ</var>)<sup>n</sup></span><span>(1 + <var>rⱼ</var>)<sup>n</sup> − 1</span></span></div>
                   <p data-i18n="stressCalcZeroRate">Pri nulovej sadzbe použijeme M = B / n.</p>
                   <h3 data-i18n="stressCalcScenarios">Scenáre sadzby</h3>
-                  <p data-i18n="stressCalcScenariosHelp">Splátku vypočítame pre a, a + 1, a + 2 a a + 3 percentuálne body. Ide o citlivostné scenáre, nie predpoveď sadzieb.</p>
+                  <p data-i18n="stressCalcScenariosHelp">Začíname sadzbou a; každý ďalší scenár pridá +1 percentuálny bod. Ide o citlivostné scenáre, nie predpoveď sadzieb.</p>
                   <h3 data-i18n="stressCalcOutputs">Zobrazené rozdiely</h3>
                   <div class="formula-stack"><code>ΔMⱼ = Mⱼ − M₀</code><code>shareⱼ = Mⱼ / D × 100</code></div>
                   <p data-i18n="stressCalcOutputsHelp">Zmena splátky je Mⱼ − M₀. Podiel príjmu je Mⱼ / D × 100. Nezahŕňa ostatné výdavky ani dlhy domácnosti.</p>
