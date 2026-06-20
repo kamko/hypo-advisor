@@ -869,8 +869,7 @@ function decodeDecisionUrlState() {
 }
 
 function updateDecisionUrl(state) {
-  const url = new URL(location.href);
-  ["d", "mode", "lang", "loan", "newRate", "newYears", "fees", "inMonths", "balance", "years", "rate", "income", "variants", "step"].forEach((key) => url.searchParams.delete(key));
+  const url = new URL(location.pathname, location.origin);
   url.searchParams.set("mode", state.activeDecisionMode);
   url.searchParams.set("lang", currentLanguage);
   if (state.activeDecisionMode === "fixation") {
