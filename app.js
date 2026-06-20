@@ -774,41 +774,50 @@ function readDecisionState() {
   }
 }
 
-function encodeDecisionUrlState(state) {
-  const number = (value, multiplier = 1) => Math.round(Number(value) * multiplier).toString(36);
-  const language = currentLanguage === "sk" ? "s" : "e";
-  if (state.activeDecisionMode === "fixation") return `${DECISION_URL_STATE_VERSION}.f.${language}`;
-  if (state.activeDecisionMode === "stress") {
-    const stress = [
-      number(state.stress.balance, 100),
-      number(state.stress.years),
-      number(state.stress.rate, 100),
-      number(state.stress.income, 100),
-      number(state.stress.variantCount),
-      number(state.stress.stepSize, 100),
-    ].join("_");
-    return `${DECISION_URL_STATE_VERSION}.s.${language}.${stress}`;
-  }
-  const loans = state.loans.map((loan) => [
-    number(loan.balance, 100),
-    number(loan.rate, 100),
-    number(loan.months),
-    loan.payment === null ? "-" : number(loan.payment, 100),
-  ].join("_")).join("L");
-  const offer = [
-    number(state.consolidation.rate, 100),
-    number(state.consolidation.years),
-    number(state.consolidation.fees, 100),
-    number(state.consolidation.delayMonths),
-  ].join("_");
-  return `${DECISION_URL_STATE_VERSION}.c.${language}.${loans}.${offer}`;
-}
-
 function decodeDecisionUrlState() {
-  const encoded = new URL(location.href).searchParams.get("d");
-  if (!encoded || encoded.length > 8000) return null;
+  const url = new URL(location.href);
+  const params = url.searchParams;
   try {
     const finite = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
+    const sharedMode = params.get("mode");
+    if (sharedMode) {
+      const mode = { fixation: "fixation", consolidation: "consolidation", stress: "stress" }[sharedMode];
+      const language = ["sk", "en"].includes(params.get("lang")) ? params.get("lang") : null;
+      if (!mode || !language) return null;
+      if (mode === "fixation") return { activeDecisionMode: mode, language };
+      if (mode === "stress") {
+        const balance = Number(params.get("balance"));
+        const years = Number(params.get("years"));
+        const rate = Number(params.get("rate"));
+        const income = Number(params.get("income"));
+        const variantCount = Number(params.get("variants"));
+        const stepSize = Number(params.get("step"));
+        if (!finite(balance, 1000, 100000000) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(rate, 0, 20) || !finite(income, 50, 10000000) || !Number.isInteger(variantCount) || !finite(variantCount, 2, 10) || !stressStepSizes.includes(stepSize)) return null;
+        return { activeDecisionMode: mode, language, stress: { balance, years, rate, income, variantCount, stepSize } };
+      }
+      const sharedLoans = params.getAll("loan");
+      if (sharedLoans.length < 1 || sharedLoans.length > 20) return null;
+      const loans = sharedLoans.map((sharedLoan) => {
+        const values = sharedLoan.split("_");
+        if (values.length !== 4) throw new Error("invalid-loan");
+        const balance = Number(values[0]);
+        const rate = Number(values[1]);
+        const months = Number(values[2]);
+        const payment = values[3] === "x" ? null : Number(values[3]);
+        if (!finite(balance, 100, 100000000) || !finite(rate, 0, 30) || !Number.isInteger(months) || !finite(months, 1, 480)) throw new Error("invalid-loan");
+        if (payment !== null && !finite(payment, 0.01, 10000000)) throw new Error("invalid-payment");
+        return { balance, rate, months, payment };
+      });
+      const rate = Number(params.get("newRate"));
+      const years = Number(params.get("newYears"));
+      const fees = Number(params.get("fees"));
+      const delayMonths = Number(params.get("inMonths"));
+      if (!finite(rate, 0, 20) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(fees, 0, 10000000) || !Number.isInteger(delayMonths) || !finite(delayMonths, 0, 479)) return null;
+      return { activeDecisionMode: mode, language, loans, consolidation: { rate, years, fees, delayMonths } };
+    }
+
+    const encoded = params.get("d");
+    if (!encoded || encoded.length > 8000) return null;
     if (encoded.startsWith(`${DECISION_URL_STATE_VERSION}.`)) {
       const parts = encoded.split(".");
       const mode = { f: "fixation", c: "consolidation", s: "stress" }[parts[1]];
@@ -861,6 +870,9 @@ function decodeDecisionUrlState() {
 
 function updateDecisionUrl(state) {
   const url = new URL(location.href);
+  ["d", "mode", "lang", "loan", "newRate", "newYears", "fees", "inMonths", "balance", "years", "rate", "income", "variants", "step"].forEach((key) => url.searchParams.delete(key));
+  url.searchParams.set("mode", state.activeDecisionMode);
+  url.searchParams.set("lang", currentLanguage);
   if (state.activeDecisionMode === "fixation") {
     try {
       const values = getValues();
@@ -872,7 +884,23 @@ function updateDecisionUrl(state) {
   } else {
     url.searchParams.delete("s");
   }
-  url.searchParams.set("d", encodeDecisionUrlState(state));
+  if (state.activeDecisionMode === "consolidation") {
+    state.loans.forEach((loan) => {
+      url.searchParams.append("loan", [loan.balance, loan.rate, loan.months, loan.payment ?? "x"].join("_"));
+    });
+    url.searchParams.set("newRate", state.consolidation.rate);
+    url.searchParams.set("newYears", state.consolidation.years);
+    url.searchParams.set("fees", state.consolidation.fees);
+    url.searchParams.set("inMonths", state.consolidation.delayMonths);
+  }
+  if (state.activeDecisionMode === "stress") {
+    url.searchParams.set("balance", state.stress.balance);
+    url.searchParams.set("years", state.stress.years);
+    url.searchParams.set("rate", state.stress.rate);
+    url.searchParams.set("income", state.stress.income);
+    url.searchParams.set("variants", state.stress.variantCount);
+    url.searchParams.set("step", state.stress.stepSize);
+  }
   history.replaceState(null, "", url);
 }
 
