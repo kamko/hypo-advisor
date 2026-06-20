@@ -117,13 +117,13 @@ const englishCopy = {
   loanBalance: "Outstanding balance",
   loanRate: "Interest rate",
   loanTerm: "Remaining term",
-  loanPayment: "Current monthly payment",
+  loanPayment: "Bank payment (optional)",
   consolidationOffer: "Consolidation offer",
   consolidationOfferHelp: "The full debt is spread over the selected term. A longer term can reduce the payment but increase interest.",
   consolidationRate: "New interest rate",
   consolidationTerm: "New repayment term",
   consolidationFees: "One-off fees",
-  monthlyRelief: "Change in monthly payment",
+  monthlyRelief: "Change in modelled payment",
   totalInterestFees: "Total interest + fees",
   keepSeparate: "Keep loans separate",
   combineLoans: "Combine into one mortgage",
@@ -131,22 +131,25 @@ const englishCopy = {
   costDifference: "Difference in total cost",
   debtFreeDifference: "Difference in repayment time",
   consolidationMethod: "We use annuity repayment. For separate loans, we add their current payments and all future interest. For consolidation, we add the principal balances, use the new rate and term, and include fees.",
-  cashflowTitle: "How monthly cash flow changes",
+  modeledPayment: "Modelled payment",
+  paymentMismatchTitle: "The entered values conflict",
+  cashflowTitle: "How modelled cash flow changes",
   cashflowPeriod: "Period",
   separateCashflow: "Loans separate",
   consolidatedCashflow: "After consolidation",
-  cashflowHelp: "The table shows regular monthly payments between payoff dates. The final payment of a loan may be lower.",
+  cashflowHelp: "The table uses payments calculated from balance, rate and remaining term. A bank payment entered above is only a consistency check.",
   totalCashOutflow: "Total cash outflow",
-  conCalcIntro: "We simulate every loan month by month without intermediate rounding. We use the entered payment directly; when it is blank, we calculate an annuity payment.",
+  conCalcIntro: "We simulate every loan from its balance, rate and remaining term. The bank payment is only a consistency check and does not change the calculation.",
   conVarBalance: "current balance of loan i",
   conVarAnnualRate: "annual interest rate of loan i as a percentage",
   conVarMonthlyRate: "monthly rate = aᵢ / 100 / 12",
-  conVarMonths: "remaining number of months, used to estimate the payment when it is blank",
-  conVarPayment: "entered or calculated monthly payment",
-  conCalcPaymentTitle: "Payment when you leave it blank",
+  conVarMonths: "remaining number of months",
+  conVarPayment: "modelled monthly payment calculated from balance, rate and remaining term",
+  conVarBankPayment: "optional bank payment, used only to check the inputs",
+  conCalcPaymentTitle: "Modelled payment for each loan",
   conCalcZeroRate: "At a zero rate, we use Sᵢ = Bᵢ / nᵢ.",
   conCalcMonthTitle: "Every month for every loan",
-  conCalcMonthHelp: "I is interest, A is principal repaid and B is the remaining debt. We repeat until the loan is repaid. An entered payment determines the estimated payoff time and must exceed monthly interest.",
+  conCalcMonthHelp: "I is interest, A is principal repaid and B is the remaining debt. We repeat exactly nᵢ months. We compare bank payment Pᵢ with Sᵢ but never use it to extend the term.",
   conCalcCompareTitle: "Scenario comparison",
   conCalcCompareHelp: "F is the one-off fee. A negative ΔS means a lower payment after consolidation; a negative ΔC means lower total interest and fees.",
   conCalcRounding: "Calculations use full precision. Payments are shown to cents and total costs to whole euros. A bank may use daily interest, different rounding or include insurance.",
@@ -184,7 +187,7 @@ const dynamicSlovakCopy = {
   loanBalance: "Zostatok",
   loanRate: "Úroková sadzba",
   loanTerm: "Zostávajúca splatnosť",
-  loanPayment: "Aktuálna mesačná splátka",
+  loanPayment: "Splátka z banky (voliteľné)",
   monthsSuffix: "mes.",
 };
 
@@ -869,8 +872,8 @@ function updateLoanLabels() {
     row.setAttribute("aria-label", currentLanguage === "sk" ? `Úver ${index + 1}` : `Loan ${index + 1}`);
     const payment = readToolNumber(row.querySelector(".loan-payment"));
     row.querySelector(".loan-payment-source").textContent = payment
-      ? (currentLanguage === "sk" ? "Použijeme zadanú splátku." : "We use the entered payment.")
-      : (currentLanguage === "sk" ? "Prázdne pole použije anuitný odhad." : "Leave blank to use an annuity estimate.");
+      ? (currentLanguage === "sk" ? "Kontrolná hodnota; výpočet určuje zadaná splatnosť." : "A consistency check; the entered term drives the calculation.")
+      : (currentLanguage === "sk" ? "Voliteľné. Modelovú splátku vypočítame." : "Optional. We calculate the modelled payment.");
     remove.hidden = rows.length === 1;
   });
 }
@@ -885,25 +888,21 @@ function readLoans() {
 }
 
 function projectLoan(loan) {
-  const payment = loan.payment || monthlyPayment(loan.balance, loan.rate, loan.months);
+  if (!Number.isFinite(loan.balance) || !Number.isFinite(loan.rate) || !Number.isInteger(loan.months) || loan.balance <= 0 || loan.rate < 0 || loan.months < 1) return null;
+  const payment = monthlyPayment(loan.balance, loan.rate, loan.months);
   const monthlyRate = loan.rate / 100 / 12;
-  if (!Number.isFinite(payment) || payment <= loan.balance * monthlyRate) return null;
 
   let balance = loan.balance;
   let interest = 0;
   let paid = 0;
-  let months = 0;
-  while (balance > 0.005 && months < 1200) {
+  for (let month = 0; month < loan.months; month += 1) {
     const interestPart = balance * monthlyRate;
     const principalPart = Math.min(payment - interestPart, balance);
-    if (principalPart <= 0) return null;
     interest += interestPart;
     paid += interestPart + principalPart;
     balance = Math.max(0, balance - principalPart);
-    months += 1;
   }
-  if (balance > 0.005) return null;
-  return { payment, interest, paid, months };
+  return { payment, interest, paid, months: loan.months };
 }
 
 function renderConsolidation() {
@@ -916,19 +915,12 @@ function renderConsolidation() {
   const fees = readToolNumber(document.querySelector("#conFees"));
   const projections = loans.map(projectLoan);
   const loanRows = [...document.querySelectorAll(".loan-row")];
-  projections.forEach((projection, index) => {
-    const paymentInput = loanRows[index]?.querySelector(".loan-payment");
-    if (paymentInput) paymentInput.setCustomValidity(projection || loans[index].payment === null ? "" : "payment-too-low");
-  });
   const validLoans = loans.length > 0
     && loans.every((loan) => loan.balance >= 100 && loan.rate >= 0 && loan.rate <= 30 && loan.months >= 1)
     && projections.every(Boolean);
 
   if (!formElement.checkValidity() || !validLoans || newRate < 0 || newMonths < 1 || fees < 0) {
-    const lowPayment = projections.some((projection, index) => !projection && loans[index]?.payment !== null);
-    error.textContent = lowPayment
-      ? (currentLanguage === "sk" ? "Zadaná splátka musí byť vyššia než mesačný úrok, aby sa dlh znižoval." : "The entered payment must exceed monthly interest so the debt decreases.")
-      : (currentLanguage === "sk" ? "Skontrolujte hodnoty pri všetkých úveroch a v ponuke." : "Check the values for every loan and the consolidation offer.");
+    error.textContent = currentLanguage === "sk" ? "Skontrolujte hodnoty pri všetkých úveroch a v ponuke." : "Check the values for every loan and the consolidation offer.";
     error.hidden = false;
     content.hidden = true;
     return;
@@ -937,14 +929,27 @@ function renderConsolidation() {
   error.hidden = true;
   content.hidden = false;
   updateLoanLabels();
+  const mismatches = [];
   projections.forEach((projection, index) => {
-    loanRows[index].querySelector(".loan-payment-source").textContent = loans[index].payment
-      ? (currentLanguage === "sk"
-        ? `Pri tejto splátke odhadujeme splatenie o ${pluralMonths(projection.months)}.`
-        : `At this payment, estimated payoff is in ${pluralMonths(projection.months)}.`)
-      : (currentLanguage === "sk"
-        ? `Anuitný odhad na ${pluralMonths(projection.months)}.`
-        : `Annuity estimate over ${pluralMonths(projection.months)}.`);
+    const bankPayment = loans[index].payment;
+    const tolerance = Math.max(1, projection.payment * 0.005);
+    const mismatch = bankPayment !== null && Math.abs(bankPayment - projection.payment) > tolerance;
+    if (mismatch) mismatches.push(index);
+    const source = loanRows[index].querySelector(".loan-payment-source");
+    source.classList.toggle("is-warning", mismatch);
+    if (bankPayment === null) {
+      source.textContent = currentLanguage === "sk"
+        ? `Modelová splátka pri tejto sadzbe a splatnosti: ${formatEuro(projection.payment, 2)}.`
+        : `Modelled payment at this rate and term: ${formatEuro(projection.payment, 2)}.`;
+    } else if (mismatch) {
+      source.textContent = currentLanguage === "sk"
+        ? `Zadaných ${formatEuro(bankPayment, 2)} nesedí s dobou ${pluralMonths(loans[index].months)}. Vo výpočte použijeme ${formatEuro(projection.payment, 2)}.`
+        : `${formatEuro(bankPayment, 2)} does not match a ${pluralMonths(loans[index].months)} term. We use ${formatEuro(projection.payment, 2)}.`;
+    } else {
+      source.textContent = currentLanguage === "sk"
+        ? `Zadaná splátka sa zhoduje s modelom ${formatEuro(projection.payment, 2)}.`
+        : `The entered payment matches the ${formatEuro(projection.payment, 2)} model.`;
+    }
   });
   const separatePayment = projections.reduce((sum, projection) => sum + projection.payment, 0);
   const separateCost = projections.reduce((sum, projection) => sum + projection.interest, 0);
@@ -958,13 +963,24 @@ function renderConsolidation() {
   const costSaving = separateCost - combinedCost;
   const oldMonths = Math.max(...projections.map((projection) => projection.months));
   const termDifference = newMonths - oldMonths;
+  const comparisonDuration = formatRemainingMonths(Math.max(oldMonths, newMonths));
 
+  const inputNotice = document.querySelector("#conInputNotice");
+  inputNotice.hidden = mismatches.length === 0;
+  document.querySelector("#conInputNoticeText").textContent = currentLanguage === "sk"
+    ? `${mismatches.length} ${mismatches.length === 1 ? "splátka nezodpovedá" : "splátky nezodpovedajú"} zadanej sadzbe a splatnosti. Aby sme nepredlžovali úvery, výsledok používa modelové splátky uvedené pri označených úveroch.`
+    : `${mismatches.length} entered ${mismatches.length === 1 ? "payment does not" : "payments do not"} match the rate and term. To avoid silently extending loans, the result uses the modelled payments shown beside those loans.`;
+
+  const outcomesConflict = (monthlySaving >= 0) !== (costSaving >= 0);
+  document.querySelector("#conDifferenceLabel").textContent = currentLanguage === "sk"
+    ? `Výsledok do úplného splatenia · ${comparisonDuration}`
+    : `Result until fully repaid · ${comparisonDuration}`;
   document.querySelector("#conHeadline").textContent = currentLanguage === "sk"
-    ? `Mesačná splátka ${monthlySaving >= 0 ? "klesne" : "stúpne"} o ${formatEuro(Math.abs(monthlySaving), 2)}`
-    : `Monthly payment ${monthlySaving >= 0 ? "falls" : "rises"} by ${formatEuro(Math.abs(monthlySaving), 2)}`;
+    ? `Modelová splátka na začiatku ${monthlySaving >= 0 ? "klesne" : "stúpne"} o ${formatEuro(Math.abs(monthlySaving), 2)}, ${outcomesConflict ? "ale" : "a"} za ${comparisonDuration} zaplatíte o ${formatEuro(Math.abs(costSaving))} ${costSaving >= 0 ? "menej" : "viac"}.`
+    : `Initially, the modelled payment ${monthlySaving >= 0 ? "falls" : "rises"} by ${formatEuro(Math.abs(monthlySaving), 2)}, ${outcomesConflict ? "but" : "and"} over ${comparisonDuration} you pay ${formatEuro(Math.abs(costSaving))} ${costSaving >= 0 ? "less" : "more"}.`;
   document.querySelector("#conSummary").textContent = currentLanguage === "sk"
-    ? `Konsolidácia ${costSaving >= 0 ? "zníži" : "zvýši"} celkové úroky a poplatky o ${formatEuro(Math.abs(costSaving))}. Nižšia splátka sama osebe neznamená lacnejší úver.`
-    : `Consolidation ${costSaving >= 0 ? "reduces" : "increases"} total interest and fees by ${formatEuro(Math.abs(costSaving))}. A lower payment does not by itself mean a cheaper loan.`;
+    ? `Do úplného splatenia odíde z účtu ${formatEuro(combinedPaid)} po spojení oproti ${formatEuro(separatePaid)} pri oddelených úveroch.`
+    : `Until fully repaid, ${formatEuro(combinedPaid)} leaves your account after consolidation versus ${formatEuro(separatePaid)} with separate loans.`;
   document.querySelector("#conSeparatePayment").textContent = formatEuro(separatePayment, 2);
   document.querySelector("#conSeparateCost").textContent = formatEuro(separateCost);
   document.querySelector("#conCombinedPayment").textContent = formatEuro(combinedPayment, 2);
@@ -977,16 +993,28 @@ function renderConsolidation() {
     const period = start + 1 === end
       ? (currentLanguage === "sk" ? `Mesiac ${end}` : `Month ${end}`)
       : (currentLanguage === "sk" ? `Mesiace ${start + 1}–${end}` : `Months ${start + 1}–${end}`);
-    return `<div class="cashflow-row" role="row"><span role="cell">${period}</span><strong role="cell">${formatEuro(separateCashflow, 2)}</strong><strong role="cell">${formatEuro(consolidatedCashflow, 2)}</strong></div>`;
+    const phase = consolidatedCashflow === 0 && separateCashflow > 0
+      ? (currentLanguage === "sk" ? `Po splatení konsolidácie · ${period.toLowerCase()}` : `After consolidation ends · ${period.toLowerCase()}`)
+      : separateCashflow === 0 && consolidatedCashflow > 0
+        ? (currentLanguage === "sk" ? `Po splatení pôvodných úverov · ${period.toLowerCase()}` : `After original loans end · ${period.toLowerCase()}`)
+        : period;
+    return `<div class="cashflow-row" role="row"><span role="cell">${phase}</span><strong role="cell">${formatEuro(separateCashflow, 2)}</strong><strong role="cell">${formatEuro(consolidatedCashflow, 2)}</strong></div>`;
   }).join("");
-  document.querySelector("#conMonthlyDifference").textContent = `${monthlySaving >= 0 ? "−" : "+"}${formatEuro(Math.abs(monthlySaving), 2)}`;
+  document.querySelector("#conMonthlyDifference").textContent = currentLanguage === "sk"
+    ? `o ${formatEuro(Math.abs(monthlySaving), 2)} ${monthlySaving >= 0 ? "nižšia" : "vyššia"} na začiatku`
+    : `${formatEuro(Math.abs(monthlySaving), 2)} ${monthlySaving >= 0 ? "lower" : "higher"} initially`;
   document.querySelector("#conTotalOutflow").textContent = currentLanguage === "sk"
     ? `${formatEuro(separatePaid)} oddelene · ${formatEuro(combinedPaid)} po spojení`
     : `${formatEuro(separatePaid)} separate · ${formatEuro(combinedPaid)} combined`;
-  document.querySelector("#conCostDifference").textContent = `${costSaving >= 0 ? "−" : "+"}${formatEuro(Math.abs(costSaving))}`;
-  document.querySelector("#conTermDifference").textContent = currentLanguage === "sk"
-    ? `${termDifference > 0 ? "+" : termDifference < 0 ? "−" : ""}${pluralMonths(Math.abs(termDifference))}`
-    : `${termDifference > 0 ? "+" : termDifference < 0 ? "−" : ""}${pluralMonths(Math.abs(termDifference))}`;
+  document.querySelector("#conCostDifferenceLabel").textContent = currentLanguage === "sk" ? "Celkovo zaplatíte" : "Total amount paid";
+  document.querySelector("#conCostDifference").textContent = currentLanguage === "sk"
+    ? `o ${formatEuro(Math.abs(costSaving))} ${costSaving >= 0 ? "menej" : "viac"}`
+    : `${formatEuro(Math.abs(costSaving))} ${costSaving >= 0 ? "less" : "more"}`;
+  document.querySelector("#conTermDifference").textContent = termDifference === 0
+    ? (currentLanguage === "sk" ? "rovnaká" : "the same")
+    : (currentLanguage === "sk"
+      ? `o ${formatRemainingMonths(Math.abs(termDifference))} ${termDifference > 0 ? "dlhšia" : "kratšia"}`
+      : `${formatRemainingMonths(Math.abs(termDifference))} ${termDifference > 0 ? "longer" : "shorter"}`);
   saveDecisionState();
 }
 

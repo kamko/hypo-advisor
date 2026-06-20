@@ -277,7 +277,7 @@
                   <label class="field"><span data-i18n="loanBalance">Zostatok</span><span class="input-shell"><input class="loan-balance" type="text" inputmode="decimal" data-number data-min="100" required><span>€</span></span></label>
                   <label class="field"><span data-i18n="loanRate">Úroková sadzba</span><span class="input-shell"><input class="loan-rate" type="text" inputmode="decimal" data-number data-min="0" data-max="30" required><span>%</span></span></label>
                   <label class="field"><span data-i18n="loanTerm">Zostávajúca splatnosť</span><span class="input-shell"><input class="loan-months" type="number" min="1" max="480" step="1" required><span data-i18n="monthsSuffix">mes.</span></span></label>
-                  <label class="field"><span data-i18n="loanPayment">Aktuálna mesačná splátka</span><span class="input-shell"><input class="loan-payment" type="text" inputmode="decimal" data-number data-min="0.01" placeholder="Vypočítame"><span>€</span></span><small class="loan-payment-source"></small></label>
+                  <label class="field"><span data-i18n="loanPayment">Splátka z banky (voliteľné)</span><span class="input-shell"><input class="loan-payment" type="text" inputmode="decimal" data-number data-min="0.01" placeholder="Vypočítame"><span>€</span></span><small class="loan-payment-source"></small></label>
                 </div>
               </template>
             </section>
@@ -300,39 +300,41 @@
             </div>
             <div id="consolidation-error" class="error-message" role="alert" hidden></div>
             <div id="consolidation-results">
-              <div class="difference-block"><p data-i18n="monthlyRelief">Zmena mesačnej splátky</p><strong id="conHeadline">—</strong><p id="conSummary">—</p></div>
+              <div id="conInputNotice" class="input-notice" hidden><strong data-i18n="paymentMismatchTitle">Zadané údaje si odporujú</strong><p id="conInputNoticeText"></p></div>
+              <div class="difference-block"><p id="conDifferenceLabel">Výsledok do úplného splatenia</p><strong id="conHeadline">—</strong><p id="conSummary">—</p></div>
               <div class="scenario-table result-grid" role="table" aria-label="Porovnanie konsolidácie">
-                <div class="scenario-row scenario-head" role="row"><span role="columnheader" data-i18n="scenario">Scenár</span><span role="columnheader" data-i18n="payment">Splátka</span><span role="columnheader" data-i18n="totalInterestFees">Úroky + poplatky celkom</span></div>
+                <div class="scenario-row scenario-head" role="row"><span role="columnheader" data-i18n="scenario">Scenár</span><span role="columnheader" data-i18n="modeledPayment">Modelová splátka</span><span role="columnheader" data-i18n="totalInterestFees">Úroky + poplatky celkom</span></div>
                 <div class="scenario-row" role="row"><span role="cell" data-i18n="keepSeparate">Úvery oddelene</span><strong id="conSeparatePayment" role="cell">—</strong><strong id="conSeparateCost" role="cell">—</strong></div>
                 <div class="scenario-row" role="row"><span role="cell" data-i18n="combineLoans">Spojiť do hypotéky</span><strong id="conCombinedPayment" role="cell">—</strong><strong id="conCombinedCost" role="cell">—</strong></div>
               </div>
               <div class="cashflow-section">
-                <h3 data-i18n="cashflowTitle">Ako sa mení mesačný cashflow</h3>
+                <h3 data-i18n="cashflowTitle">Ako sa mení modelový cashflow</h3>
                 <div class="cashflow-table" role="table" aria-label="Mesačný cashflow v čase">
                   <div class="cashflow-row cashflow-head" role="row"><span role="columnheader" data-i18n="cashflowPeriod">Obdobie</span><span role="columnheader" data-i18n="separateCashflow">Úvery oddelene</span><span role="columnheader" data-i18n="consolidatedCashflow">Po konsolidácii</span></div>
                   <div id="conCashflowRows"></div>
                 </div>
-                <p data-i18n="cashflowHelp">Tabuľka zobrazuje pravidelné mesačné splátky medzi termínmi splatenia. Posledná splátka úveru môže byť nižšia.</p>
+                <p data-i18n="cashflowHelp">Tabuľka používa splátky vypočítané zo zostatku, sadzby a zostávajúcej splatnosti. Splátka z banky je iba kontrola konzistencie.</p>
               </div>
               <div class="insight-list">
                 <div><span data-i18n="monthlyDifference">Rozdiel mesačne</span><strong id="conMonthlyDifference">—</strong></div>
                 <div><span data-i18n="totalCashOutflow">Spolu odíde z účtu</span><strong id="conTotalOutflow">—</strong></div>
-                <div><span data-i18n="costDifference">Rozdiel celkových nákladov</span><strong id="conCostDifference">—</strong></div>
+                <div><span id="conCostDifferenceLabel" data-i18n="costDifference">Rozdiel celkových nákladov</span><strong id="conCostDifference">—</strong></div>
                 <div><span data-i18n="debtFreeDifference">Rozdiel doby splácania</span><strong id="conTermDifference">—</strong></div>
               </div>
               <details>
                 <summary data-i18n="calculationTitle">Ako to počítame</summary>
                 <div class="calculation-doc consolidation-calculation">
-                  <p data-i18n="conCalcIntro">Každý úver simulujeme mesiac po mesiaci bez priebežného zaokrúhľovania. Zadanú splátku použijeme priamo; ak chýba, vypočítame anuitnú splátku.</p>
+                  <p data-i18n="conCalcIntro">Každý úver simulujeme zo zostatku, sadzby a zostávajúcej splatnosti. Splátka z banky je iba kontrolná hodnota a nemení výpočet.</p>
                   <h3 data-i18n="calcVariables">Premenné</h3>
                   <dl>
                     <dt><var>Bᵢ</var></dt><dd data-i18n="conVarBalance">aktuálny zostatok i-teho úveru</dd>
                     <dt><var>aᵢ</var></dt><dd data-i18n="conVarAnnualRate">ročná úroková sadzba i-teho úveru v percentách</dd>
                     <dt><var>rᵢ</var></dt><dd data-i18n="conVarMonthlyRate">mesačná sadzba = aᵢ / 100 / 12</dd>
-                    <dt><var>nᵢ</var></dt><dd data-i18n="conVarMonths">zostávajúci počet mesiacov, z ktorého odhadneme splátku, ak je prázdna</dd>
-                    <dt><var>Sᵢ</var></dt><dd data-i18n="conVarPayment">zadaná alebo vypočítaná mesačná splátka</dd>
+                    <dt><var>nᵢ</var></dt><dd data-i18n="conVarMonths">zostávajúci počet mesiacov</dd>
+                    <dt><var>Sᵢ</var></dt><dd data-i18n="conVarPayment">modelová mesačná splátka vypočítaná zo zostatku, sadzby a splatnosti</dd>
+                    <dt><var>Pᵢ</var></dt><dd data-i18n="conVarBankPayment">voliteľná splátka z banky, používaná iba na kontrolu vstupov</dd>
                   </dl>
-                  <h3 data-i18n="conCalcPaymentTitle">Splátka, ak ju nezadáte</h3>
+                  <h3 data-i18n="conCalcPaymentTitle">Modelová splátka každého úveru</h3>
                   <div class="formula"><var>Sᵢ</var> = <var>Bᵢ</var> × <span class="fraction"><span><var>rᵢ</var>(1 + <var>rᵢ</var>)<sup>nᵢ</sup></span><span>(1 + <var>rᵢ</var>)<sup>nᵢ</sup> − 1</span></span></div>
                   <p data-i18n="conCalcZeroRate">Pri nulovej sadzbe použijeme Sᵢ = Bᵢ / nᵢ.</p>
                   <h3 data-i18n="conCalcMonthTitle">Každý mesiac každého úveru</h3>
@@ -341,7 +343,7 @@
                     <code>Aᵢ,ₜ = min(Sᵢ − Iᵢ,ₜ, Bᵢ,ₜ₋₁)</code>
                     <code>Bᵢ,ₜ = max(0, Bᵢ,ₜ₋₁ − Aᵢ,ₜ)</code>
                   </div>
-                  <p data-i18n="conCalcMonthHelp">I je úrok, A splatená istina a B zostávajúci dlh. Opakujeme, kým sa úver nesplatí. Zadaná splátka určuje odhadovaný čas splatenia a musí byť vyššia než mesačný úrok.</p>
+                  <p data-i18n="conCalcMonthHelp">I je úrok, A splatená istina a B zostávajúci dlh. Výpočet opakujeme presne nᵢ mesiacov. Splátku Pᵢ z banky porovnáme so Sᵢ, ale nepoužijeme ju na predlžovanie splatnosti.</p>
                   <h3 data-i18n="conCalcCompareTitle">Porovnanie scenárov</h3>
                   <div class="formula-stack">
                     <code>S<sub>oddelene</sub> = Σ Sᵢ</code>

@@ -346,6 +346,18 @@ h1 {
   font-weight: 650;
 }
 
+.input-notice {
+  margin-top: 20px;
+  padding: 13px 14px;
+  border-radius: var(--radius-sm);
+  background: oklch(0.95 0.035 75);
+  color: oklch(0.34 0.075 55);
+}
+
+.input-notice strong { display: block; font-size: 12px; }
+.input-notice p { margin: 4px 0 0; font-size: 11px; line-height: 1.55; }
+.loan-payment-source.is-warning { color: oklch(0.42 0.1 55); font-weight: 650; }
+
 .difference-block {
   padding: 28px 0 25px;
 }
