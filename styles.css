@@ -650,7 +650,7 @@ details p { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height:
 
 .loan-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   margin: 0;
   padding: 18px;
@@ -710,6 +710,24 @@ details p { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height:
 .compact-results .difference-block > p:last-child { font-size: 12px; }
 
 .result-grid .scenario-row { grid-template-columns: minmax(118px, 1fr) 102px 112px; }
+
+.cashflow-section { padding: 22px 0 6px; border-bottom: 1px solid var(--line); }
+.cashflow-section h3 { margin: 0 0 10px; font-size: 12px; letter-spacing: -0.01em; }
+.cashflow-table { border-top: 1px solid var(--line); }
+
+.cashflow-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) 104px 104px;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.cashflow-row > :nth-child(n + 2) { text-align: right; font-variant-numeric: tabular-nums; }
+.cashflow-head { min-height: 32px; color: var(--muted); font-size: 9px; font-weight: 700; }
+.cashflow-section > p { margin: 9px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 
 .insight-list { padding: 16px 0; border-bottom: 1px solid var(--line); }
 
@@ -802,6 +820,7 @@ footer p { margin: 0; }
   .tabs button { padding-inline: 16px; }
   .loan-row { grid-template-columns: 1fr; gap: 14px; }
   .result-grid .scenario-row { grid-template-columns: minmax(100px, 1fr) 92px 96px; }
+  .cashflow-row { grid-template-columns: minmax(82px, 1fr) 94px 94px; }
   .stress-row { grid-template-columns: 62px minmax(82px, 1fr) minmax(76px, 1fr) 56px; font-size: 11px; }
   footer { min-height: 130px; flex-direction: column; align-items: flex-start; justify-content: center; }
 }

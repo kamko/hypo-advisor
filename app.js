@@ -117,6 +117,7 @@ const englishCopy = {
   loanBalance: "Outstanding balance",
   loanRate: "Interest rate",
   loanTerm: "Remaining term",
+  loanPayment: "Current monthly payment",
   consolidationOffer: "Consolidation offer",
   consolidationOfferHelp: "The full debt is spread over the selected term. A longer term can reduce the payment but increase interest.",
   consolidationRate: "New interest rate",
@@ -130,6 +131,25 @@ const englishCopy = {
   costDifference: "Difference in total cost",
   debtFreeDifference: "Difference in repayment time",
   consolidationMethod: "We use annuity repayment. For separate loans, we add their current payments and all future interest. For consolidation, we add the principal balances, use the new rate and term, and include fees.",
+  cashflowTitle: "How monthly cash flow changes",
+  cashflowPeriod: "Period",
+  separateCashflow: "Loans separate",
+  consolidatedCashflow: "After consolidation",
+  cashflowHelp: "The table shows regular monthly payments between payoff dates. The final payment of a loan may be lower.",
+  totalCashOutflow: "Total cash outflow",
+  conCalcIntro: "We simulate every loan month by month without intermediate rounding. We use the entered payment directly; when it is blank, we calculate an annuity payment.",
+  conVarBalance: "current balance of loan i",
+  conVarAnnualRate: "annual interest rate of loan i as a percentage",
+  conVarMonthlyRate: "monthly rate = aᵢ / 100 / 12",
+  conVarMonths: "remaining number of months, used to estimate the payment when it is blank",
+  conVarPayment: "entered or calculated monthly payment",
+  conCalcPaymentTitle: "Payment when you leave it blank",
+  conCalcZeroRate: "At a zero rate, we use Sᵢ = Bᵢ / nᵢ.",
+  conCalcMonthTitle: "Every month for every loan",
+  conCalcMonthHelp: "I is interest, A is principal repaid and B is the remaining debt. We repeat until the loan is repaid. An entered payment determines the estimated payoff time and must exceed monthly interest.",
+  conCalcCompareTitle: "Scenario comparison",
+  conCalcCompareHelp: "F is the one-off fee. A negative ΔS means a lower payment after consolidation; a negative ΔC means lower total interest and fees.",
+  conCalcRounding: "Calculations use full precision. Payments are shown to cents and total costs to whole euros. A bank may use daily interest, different rounding or include insurance.",
   stressInputs: "Mortgage and budget",
   stressInputsHelp: "We do not predict the future. We show what higher rates would do to the household budget.",
   referenceRate: "Starting interest rate",
@@ -143,6 +163,13 @@ const englishCopy = {
   stressNoteTitle: "How to read the result",
   stressNote: "The share of income is neither bank approval nor a universal safety limit. It excludes other expenses, loans and the household's financial reserve.",
   stressMethod: "For each rate, we recalculate the annuity payment using the same balance and remaining term. The scenarios are the starting rate, then +1, +2 and +3 percentage points.",
+  stressCalcIntro: "For every scenario, the balance and remaining term stay unchanged. Only the annual interest rate changes.",
+  stressVarIncome: "entered household net monthly income",
+  stressCalcScenarios: "Rate scenarios",
+  stressCalcZeroRate: "At a zero rate, we use M = B / n.",
+  stressCalcScenariosHelp: "We calculate payments for a, a + 1, a + 2 and a + 3 percentage points. These are sensitivity scenarios, not a rate forecast.",
+  stressCalcOutputs: "Displayed differences",
+  stressCalcOutputsHelp: "Payment change is Mⱼ − M₀. Income share is Mⱼ / D × 100. It does not include other household expenses or debts.",
   mortgageBalance: "Outstanding mortgage balance",
   mortgageTerm: "Remaining mortgage term",
   mortgageIncrease: "Increase the mortgage",
@@ -157,6 +184,7 @@ const dynamicSlovakCopy = {
   loanBalance: "Zostatok",
   loanRate: "Úroková sadzba",
   loanTerm: "Zostávajúca splatnosť",
+  loanPayment: "Aktuálna mesačná splátka",
   monthsSuffix: "mes.",
 };
 
@@ -254,6 +282,9 @@ function applyLanguage() {
     }
   });
   document.querySelector("#currentPayment").placeholder = currentLanguage === "sk" ? "Vypočítame" : "Calculated automatically";
+  document.querySelectorAll(".loan-payment").forEach((input) => {
+    input.placeholder = currentLanguage === "sk" ? "Vypočítame" : "Calculated automatically";
+  });
 }
 
 function monthlyPayment(principal, annualRate, months) {
@@ -368,6 +399,15 @@ function parseLocalizedNumber(rawValue) {
     value = `${integerPart}.${decimalPart}`;
   }
   return Number(value);
+}
+
+function readToolNumber(input) {
+  const value = parseLocalizedNumber(input.value);
+  const min = input.dataset.min === undefined ? -Infinity : Number(input.dataset.min);
+  const max = input.dataset.max === undefined ? Infinity : Number(input.dataset.max);
+  const valid = value === null ? !input.required : Number.isFinite(value) && value >= min && value <= max;
+  input.setCustomValidity(valid ? "" : "invalid");
+  return value;
 }
 
 function parseLocalDate(value) {
@@ -722,15 +762,15 @@ function saveDecisionState() {
     activeDecisionMode,
     loans,
     consolidation: {
-      rate: Number(document.querySelector("#conNewRate").value),
+      rate: readToolNumber(document.querySelector("#conNewRate")),
       years: Number(document.querySelector("#conNewYears").value),
-      fees: Number(document.querySelector("#conFees").value),
+      fees: readToolNumber(document.querySelector("#conFees")),
     },
     stress: {
-      balance: Number(document.querySelector("#stressBalance").value),
+      balance: readToolNumber(document.querySelector("#stressBalance")),
       years: Number(document.querySelector("#stressYears").value),
-      rate: Number(document.querySelector("#stressRate").value),
-      income: Number(document.querySelector("#stressIncome").value),
+      rate: readToolNumber(document.querySelector("#stressRate")),
+      income: readToolNumber(document.querySelector("#stressIncome")),
     },
   };
   localStorage.setItem(DECISIONS_STORAGE_KEY, JSON.stringify(state));
@@ -743,12 +783,18 @@ function translateElement(element) {
   });
 }
 
+function editableNumber(value) {
+  if (value === null || value === undefined || value === "") return "";
+  return String(value).replace(".", currentLanguage === "sk" ? "," : ".");
+}
+
 function addLoan(loan = { balance: 5000, rate: 7.9, months: 48 }) {
   const fragment = document.querySelector("#loan-row-template").content.cloneNode(true);
   const row = fragment.querySelector(".loan-row");
-  row.querySelector(".loan-balance").value = loan.balance;
-  row.querySelector(".loan-rate").value = loan.rate;
+  row.querySelector(".loan-balance").value = editableNumber(loan.balance);
+  row.querySelector(".loan-rate").value = editableNumber(loan.rate);
   row.querySelector(".loan-months").value = loan.months;
+  row.querySelector(".loan-payment").value = editableNumber(loan.payment);
   row.querySelector(".remove-loan").addEventListener("click", () => {
     row.remove();
     updateLoanLabels();
@@ -767,16 +813,43 @@ function updateLoanLabels() {
     remove.textContent = currentLanguage === "sk" ? "Odobrať" : "Remove";
     remove.setAttribute("aria-label", currentLanguage === "sk" ? `Odobrať úver ${index + 1}` : `Remove loan ${index + 1}`);
     row.setAttribute("aria-label", currentLanguage === "sk" ? `Úver ${index + 1}` : `Loan ${index + 1}`);
+    const payment = readToolNumber(row.querySelector(".loan-payment"));
+    row.querySelector(".loan-payment-source").textContent = payment
+      ? (currentLanguage === "sk" ? "Použijeme zadanú splátku." : "We use the entered payment.")
+      : (currentLanguage === "sk" ? "Prázdne pole použije anuitný odhad." : "Leave blank to use an annuity estimate.");
     remove.hidden = rows.length === 1;
   });
 }
 
 function readLoans() {
   return [...document.querySelectorAll(".loan-row")].map((row) => ({
-    balance: Number(row.querySelector(".loan-balance").value),
-    rate: Number(row.querySelector(".loan-rate").value),
+    balance: readToolNumber(row.querySelector(".loan-balance")),
+    rate: readToolNumber(row.querySelector(".loan-rate")),
     months: Number(row.querySelector(".loan-months").value),
+    payment: readToolNumber(row.querySelector(".loan-payment")),
   }));
+}
+
+function projectLoan(loan) {
+  const payment = loan.payment || monthlyPayment(loan.balance, loan.rate, loan.months);
+  const monthlyRate = loan.rate / 100 / 12;
+  if (!Number.isFinite(payment) || payment <= loan.balance * monthlyRate) return null;
+
+  let balance = loan.balance;
+  let interest = 0;
+  let paid = 0;
+  let months = 0;
+  while (balance > 0.005 && months < 1200) {
+    const interestPart = balance * monthlyRate;
+    const principalPart = Math.min(payment - interestPart, balance);
+    if (principalPart <= 0) return null;
+    interest += interestPart;
+    paid += interestPart + principalPart;
+    balance = Math.max(0, balance - principalPart);
+    months += 1;
+  }
+  if (balance > 0.005) return null;
+  return { payment, interest, paid, months };
 }
 
 function renderConsolidation() {
@@ -784,13 +857,24 @@ function renderConsolidation() {
   const error = document.querySelector("#consolidation-error");
   const content = document.querySelector("#consolidation-results");
   const loans = readLoans();
-  const newRate = Number(document.querySelector("#conNewRate").value);
+  const newRate = readToolNumber(document.querySelector("#conNewRate"));
   const newMonths = Number(document.querySelector("#conNewYears").value) * 12;
-  const fees = Number(document.querySelector("#conFees").value);
-  const validLoans = loans.length > 0 && loans.every((loan) => loan.balance >= 100 && loan.rate >= 0 && loan.rate <= 30 && loan.months >= 1);
+  const fees = readToolNumber(document.querySelector("#conFees"));
+  const projections = loans.map(projectLoan);
+  const loanRows = [...document.querySelectorAll(".loan-row")];
+  projections.forEach((projection, index) => {
+    const paymentInput = loanRows[index]?.querySelector(".loan-payment");
+    if (paymentInput) paymentInput.setCustomValidity(projection || loans[index].payment === null ? "" : "payment-too-low");
+  });
+  const validLoans = loans.length > 0
+    && loans.every((loan) => loan.balance >= 100 && loan.rate >= 0 && loan.rate <= 30 && loan.months >= 1)
+    && projections.every(Boolean);
 
   if (!formElement.checkValidity() || !validLoans || newRate < 0 || newMonths < 1 || fees < 0) {
-    error.textContent = currentLanguage === "sk" ? "Skontrolujte hodnoty pri všetkých úveroch a v ponuke." : "Check the values for every loan and the consolidation offer.";
+    const lowPayment = projections.some((projection, index) => !projection && loans[index]?.payment !== null);
+    error.textContent = lowPayment
+      ? (currentLanguage === "sk" ? "Zadaná splátka musí byť vyššia než mesačný úrok, aby sa dlh znižoval." : "The entered payment must exceed monthly interest so the debt decreases.")
+      : (currentLanguage === "sk" ? "Skontrolujte hodnoty pri všetkých úveroch a v ponuke." : "Check the values for every loan and the consolidation offer.");
     error.hidden = false;
     content.hidden = true;
     return;
@@ -798,17 +882,27 @@ function renderConsolidation() {
 
   error.hidden = true;
   content.hidden = false;
-  const separatePayment = loans.reduce((sum, loan) => sum + monthlyPayment(loan.balance, loan.rate, loan.months), 0);
-  const separateCost = loans.reduce((sum, loan) => {
-    const payment = monthlyPayment(loan.balance, loan.rate, loan.months);
-    return sum + payment * loan.months - loan.balance;
-  }, 0);
+  updateLoanLabels();
+  projections.forEach((projection, index) => {
+    loanRows[index].querySelector(".loan-payment-source").textContent = loans[index].payment
+      ? (currentLanguage === "sk"
+        ? `Pri tejto splátke odhadujeme splatenie o ${pluralMonths(projection.months)}.`
+        : `At this payment, estimated payoff is in ${pluralMonths(projection.months)}.`)
+      : (currentLanguage === "sk"
+        ? `Anuitný odhad na ${pluralMonths(projection.months)}.`
+        : `Annuity estimate over ${pluralMonths(projection.months)}.`);
+  });
+  const separatePayment = projections.reduce((sum, projection) => sum + projection.payment, 0);
+  const separateCost = projections.reduce((sum, projection) => sum + projection.interest, 0);
+  const separatePaid = projections.reduce((sum, projection) => sum + projection.paid, 0);
   const principal = loans.reduce((sum, loan) => sum + loan.balance, 0);
   const combinedPayment = monthlyPayment(principal, newRate, newMonths);
-  const combinedCost = combinedPayment * newMonths - principal + fees;
+  const combinedProjection = projectLoan({ balance: principal, rate: newRate, months: newMonths, payment: combinedPayment });
+  const combinedCost = combinedProjection.interest + fees;
+  const combinedPaid = combinedProjection.paid + fees;
   const monthlySaving = separatePayment - combinedPayment;
   const costSaving = separateCost - combinedCost;
-  const oldMonths = Math.max(...loans.map((loan) => loan.months));
+  const oldMonths = Math.max(...projections.map((projection) => projection.months));
   const termDifference = newMonths - oldMonths;
 
   document.querySelector("#conHeadline").textContent = currentLanguage === "sk"
@@ -821,7 +915,20 @@ function renderConsolidation() {
   document.querySelector("#conSeparateCost").textContent = formatEuro(separateCost);
   document.querySelector("#conCombinedPayment").textContent = formatEuro(combinedPayment, 2);
   document.querySelector("#conCombinedCost").textContent = formatEuro(combinedCost);
+  const breakpoints = [...new Set([0, ...projections.map((projection) => projection.months), newMonths])].sort((a, b) => a - b);
+  document.querySelector("#conCashflowRows").innerHTML = breakpoints.slice(1).map((end, index) => {
+    const start = breakpoints[index];
+    const separateCashflow = projections.reduce((sum, projection) => sum + (projection.months > start ? projection.payment : 0), 0);
+    const consolidatedCashflow = newMonths > start ? combinedPayment : 0;
+    const period = start + 1 === end
+      ? (currentLanguage === "sk" ? `Mesiac ${end}` : `Month ${end}`)
+      : (currentLanguage === "sk" ? `Mesiace ${start + 1}–${end}` : `Months ${start + 1}–${end}`);
+    return `<div class="cashflow-row" role="row"><span role="cell">${period}</span><strong role="cell">${formatEuro(separateCashflow, 2)}</strong><strong role="cell">${formatEuro(consolidatedCashflow, 2)}</strong></div>`;
+  }).join("");
   document.querySelector("#conMonthlyDifference").textContent = `${monthlySaving >= 0 ? "−" : "+"}${formatEuro(Math.abs(monthlySaving), 2)}`;
+  document.querySelector("#conTotalOutflow").textContent = currentLanguage === "sk"
+    ? `${formatEuro(separatePaid)} oddelene · ${formatEuro(combinedPaid)} po spojení`
+    : `${formatEuro(separatePaid)} separate · ${formatEuro(combinedPaid)} combined`;
   document.querySelector("#conCostDifference").textContent = `${costSaving >= 0 ? "−" : "+"}${formatEuro(Math.abs(costSaving))}`;
   document.querySelector("#conTermDifference").textContent = currentLanguage === "sk"
     ? `${termDifference > 0 ? "+" : termDifference < 0 ? "−" : ""}${pluralMonths(Math.abs(termDifference))}`
@@ -833,10 +940,10 @@ function renderStressTest() {
   const formElement = document.querySelector("#stress-form");
   const error = document.querySelector("#stress-error");
   const content = document.querySelector("#stress-results");
-  const balance = Number(document.querySelector("#stressBalance").value);
+  const balance = readToolNumber(document.querySelector("#stressBalance"));
   const months = Number(document.querySelector("#stressYears").value) * 12;
-  const baseRate = Number(document.querySelector("#stressRate").value);
-  const income = Number(document.querySelector("#stressIncome").value);
+  const baseRate = readToolNumber(document.querySelector("#stressRate"));
+  const income = readToolNumber(document.querySelector("#stressIncome"));
 
   if (!formElement.checkValidity() || balance < 1000 || months < 1 || baseRate < 0 || income <= 0) {
     error.textContent = currentLanguage === "sk" ? "Skontrolujte hodnoty hypotéky a príjmu." : "Check the mortgage and income values.";
@@ -903,12 +1010,12 @@ function setDecisionMode(mode, shouldFocus = true) {
 function resetDecisionTools() {
   document.querySelector("#loan-list").replaceChildren();
   defaultLoans.forEach(addLoan);
-  document.querySelector("#conNewRate").value = 4.1;
+  document.querySelector("#conNewRate").value = editableNumber(4.1);
   document.querySelector("#conNewYears").value = 22;
   document.querySelector("#conFees").value = 300;
   document.querySelector("#stressBalance").value = 120000;
   document.querySelector("#stressYears").value = 22;
-  document.querySelector("#stressRate").value = 3.89;
+  document.querySelector("#stressRate").value = editableNumber(3.89);
   document.querySelector("#stressIncome").value = 2400;
   setDecisionMode("fixation", false);
   renderConsolidation();
@@ -919,15 +1026,15 @@ function initializeDecisionTools() {
   const state = readDecisionState();
   (state.loans?.length ? state.loans : defaultLoans).forEach(addLoan);
   if (state.consolidation) {
-    document.querySelector("#conNewRate").value = state.consolidation.rate;
+    document.querySelector("#conNewRate").value = editableNumber(state.consolidation.rate);
     document.querySelector("#conNewYears").value = state.consolidation.years;
-    document.querySelector("#conFees").value = state.consolidation.fees;
+    document.querySelector("#conFees").value = editableNumber(state.consolidation.fees);
   }
   if (state.stress) {
-    document.querySelector("#stressBalance").value = state.stress.balance;
+    document.querySelector("#stressBalance").value = editableNumber(state.stress.balance);
     document.querySelector("#stressYears").value = state.stress.years;
-    document.querySelector("#stressRate").value = state.stress.rate;
-    document.querySelector("#stressIncome").value = state.stress.income;
+    document.querySelector("#stressRate").value = editableNumber(state.stress.rate);
+    document.querySelector("#stressIncome").value = editableNumber(state.stress.income);
   }
   document.querySelector("#add-loan").addEventListener("click", () => {
     addLoan();

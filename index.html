@@ -274,9 +274,10 @@
               <template id="loan-row-template">
                 <div class="loan-row" role="group">
                   <div class="loan-row-header"><strong class="loan-number"></strong><button class="remove-loan" type="button"></button></div>
-                  <label class="field"><span data-i18n="loanBalance">Zostatok</span><span class="input-shell"><input class="loan-balance" type="number" min="100" step="100" required><span>€</span></span></label>
-                  <label class="field"><span data-i18n="loanRate">Úroková sadzba</span><span class="input-shell"><input class="loan-rate" type="number" min="0" max="30" step="0.01" required><span>%</span></span></label>
+                  <label class="field"><span data-i18n="loanBalance">Zostatok</span><span class="input-shell"><input class="loan-balance" type="text" inputmode="decimal" data-number data-min="100" required><span>€</span></span></label>
+                  <label class="field"><span data-i18n="loanRate">Úroková sadzba</span><span class="input-shell"><input class="loan-rate" type="text" inputmode="decimal" data-number data-min="0" data-max="30" required><span>%</span></span></label>
                   <label class="field"><span data-i18n="loanTerm">Zostávajúca splatnosť</span><span class="input-shell"><input class="loan-months" type="number" min="1" max="480" step="1" required><span data-i18n="monthsSuffix">mes.</span></span></label>
+                  <label class="field"><span data-i18n="loanPayment">Aktuálna mesačná splátka</span><span class="input-shell"><input class="loan-payment" type="text" inputmode="decimal" data-number data-min="0.01" placeholder="Vypočítame"><span>€</span></span><small class="loan-payment-source"></small></label>
                 </div>
               </template>
             </section>
@@ -286,9 +287,9 @@
                 <p data-i18n="consolidationOfferHelp">Celý dlh sa rozloží na zvolenú dobu. Dlhšia splatnosť môže znížiť splátku, ale zvýšiť úroky.</p>
               </div>
               <div class="field-grid">
-                <label class="field"><span data-i18n="consolidationRate">Nová úroková sadzba</span><span class="input-shell"><input id="conNewRate" type="number" min="0" max="20" step="0.01" value="4.1" required><span>%</span></span></label>
+                <label class="field"><span data-i18n="consolidationRate">Nová úroková sadzba</span><span class="input-shell"><input id="conNewRate" type="text" inputmode="decimal" data-number data-min="0" data-max="20" value="4.1" required><span>%</span></span></label>
                 <label class="field"><span data-i18n="consolidationTerm">Nová doba splatnosti</span><span class="input-shell"><input id="conNewYears" type="number" min="1" max="40" step="1" value="22" required><span data-i18n="yearsSuffix">rokov</span></span></label>
-                <label class="field"><span data-i18n="consolidationFees">Jednorazové poplatky</span><span class="input-shell"><input id="conFees" type="number" min="0" step="10" value="300" required><span>€</span></span></label>
+                <label class="field"><span data-i18n="consolidationFees">Jednorazové poplatky</span><span class="input-shell"><input id="conFees" type="text" inputmode="decimal" data-number data-min="0" value="300" required><span>€</span></span></label>
               </div>
             </section>
           </div>
@@ -302,12 +303,58 @@
                 <div class="scenario-row" role="row"><span role="cell" data-i18n="keepSeparate">Úvery oddelene</span><strong id="conSeparatePayment" role="cell">—</strong><strong id="conSeparateCost" role="cell">—</strong></div>
                 <div class="scenario-row" role="row"><span role="cell" data-i18n="combineLoans">Spojiť do hypotéky</span><strong id="conCombinedPayment" role="cell">—</strong><strong id="conCombinedCost" role="cell">—</strong></div>
               </div>
+              <div class="cashflow-section">
+                <h3 data-i18n="cashflowTitle">Ako sa mení mesačný cashflow</h3>
+                <div class="cashflow-table" role="table" aria-label="Mesačný cashflow v čase">
+                  <div class="cashflow-row cashflow-head" role="row"><span role="columnheader" data-i18n="cashflowPeriod">Obdobie</span><span role="columnheader" data-i18n="separateCashflow">Úvery oddelene</span><span role="columnheader" data-i18n="consolidatedCashflow">Po konsolidácii</span></div>
+                  <div id="conCashflowRows"></div>
+                </div>
+                <p data-i18n="cashflowHelp">Tabuľka zobrazuje pravidelné mesačné splátky medzi termínmi splatenia. Posledná splátka úveru môže byť nižšia.</p>
+              </div>
               <div class="insight-list">
                 <div><span data-i18n="monthlyDifference">Rozdiel mesačne</span><strong id="conMonthlyDifference">—</strong></div>
+                <div><span data-i18n="totalCashOutflow">Spolu odíde z účtu</span><strong id="conTotalOutflow">—</strong></div>
                 <div><span data-i18n="costDifference">Rozdiel celkových nákladov</span><strong id="conCostDifference">—</strong></div>
                 <div><span data-i18n="debtFreeDifference">Rozdiel doby splácania</span><strong id="conTermDifference">—</strong></div>
               </div>
-              <details><summary data-i18n="calculationTitle">Ako to počítame</summary><p data-i18n="consolidationMethod">Používame anuitné splácanie. Pri oddelených úveroch sčítame obe dnešné splátky a všetky budúce úroky. Pri konsolidácii sčítame istiny, použijeme novú sadzbu a splatnosť a pripočítame poplatky.</p></details>
+              <details>
+                <summary data-i18n="calculationTitle">Ako to počítame</summary>
+                <div class="calculation-doc consolidation-calculation">
+                  <p data-i18n="conCalcIntro">Každý úver simulujeme mesiac po mesiaci bez priebežného zaokrúhľovania. Zadanú splátku použijeme priamo; ak chýba, vypočítame anuitnú splátku.</p>
+                  <h3 data-i18n="calcVariables">Premenné</h3>
+                  <dl>
+                    <dt><var>Bᵢ</var></dt><dd data-i18n="conVarBalance">aktuálny zostatok i-teho úveru</dd>
+                    <dt><var>aᵢ</var></dt><dd data-i18n="conVarAnnualRate">ročná úroková sadzba i-teho úveru v percentách</dd>
+                    <dt><var>rᵢ</var></dt><dd data-i18n="conVarMonthlyRate">mesačná sadzba = aᵢ / 100 / 12</dd>
+                    <dt><var>nᵢ</var></dt><dd data-i18n="conVarMonths">zostávajúci počet mesiacov, z ktorého odhadneme splátku, ak je prázdna</dd>
+                    <dt><var>Sᵢ</var></dt><dd data-i18n="conVarPayment">zadaná alebo vypočítaná mesačná splátka</dd>
+                  </dl>
+                  <h3 data-i18n="conCalcPaymentTitle">Splátka, ak ju nezadáte</h3>
+                  <div class="formula"><var>Sᵢ</var> = <var>Bᵢ</var> × <span class="fraction"><span><var>rᵢ</var>(1 + <var>rᵢ</var>)<sup>nᵢ</sup></span><span>(1 + <var>rᵢ</var>)<sup>nᵢ</sup> − 1</span></span></div>
+                  <p data-i18n="conCalcZeroRate">Pri nulovej sadzbe použijeme Sᵢ = Bᵢ / nᵢ.</p>
+                  <h3 data-i18n="conCalcMonthTitle">Každý mesiac každého úveru</h3>
+                  <div class="formula-stack">
+                    <code>Iᵢ,ₜ = Bᵢ,ₜ₋₁ × rᵢ</code>
+                    <code>Aᵢ,ₜ = min(Sᵢ − Iᵢ,ₜ, Bᵢ,ₜ₋₁)</code>
+                    <code>Bᵢ,ₜ = max(0, Bᵢ,ₜ₋₁ − Aᵢ,ₜ)</code>
+                  </div>
+                  <p data-i18n="conCalcMonthHelp">I je úrok, A splatená istina a B zostávajúci dlh. Opakujeme, kým sa úver nesplatí. Zadaná splátka určuje odhadovaný čas splatenia a musí byť vyššia než mesačný úrok.</p>
+                  <h3 data-i18n="conCalcCompareTitle">Porovnanie scenárov</h3>
+                  <div class="formula-stack">
+                    <code>S<sub>oddelene</sub> = Σ Sᵢ</code>
+                    <code>C<sub>oddelene</sub> = Σ Iᵢ,ₜ</code>
+                    <code>B<sub>spolu</sub> = Σ Bᵢ</code>
+                    <code>C<sub>konsolidácia</sub> = n<sub>k</sub> × S<sub>k</sub> − B<sub>spolu</sub> + F</code>
+                    <code>CF<sub>sep,t</sub> = Σ<sub>i: t ≤ Tᵢ</sub> Sᵢ</code>
+                    <code>CF<sub>con,t</sub> = S<sub>k</sub> · 1(t ≤ n<sub>k</sub>)</code>
+                    <code>ΔS = S<sub>k</sub> − S<sub>oddelene</sub></code>
+                    <code>ΔC = C<sub>konsolidácia</sub> − C<sub>oddelene</sub></code>
+                  </div>
+                  <p data-i18n="conCalcCompareHelp">F sú jednorazové poplatky. Záporné ΔS znamená nižšiu mesačnú splátku po konsolidácii; záporné ΔC znamená nižšie celkové úroky a poplatky.</p>
+                  <h3 data-i18n="calcDates">Dátumy a zaokrúhľovanie</h3>
+                  <p data-i18n="conCalcRounding">Výpočet používa plnú presnosť. Splátky zobrazujeme na centy a celkové náklady na celé eurá. Banka môže používať denné úročenie, odlišné zaokrúhľovanie alebo zahrnúť poistenie.</p>
+                </div>
+              </details>
             </div>
           </aside>
         </div>
@@ -322,10 +369,10 @@
                 <p data-i18n="stressInputsHelp">Neodhadujeme budúcnosť. Ukazujeme, čo by s rozpočtom spravili vyššie sadzby.</p>
               </div>
               <div class="field-grid">
-                <label class="field"><span data-i18n="mortgageBalance">Zostatok hypotéky</span><span class="input-shell"><input id="stressBalance" type="number" min="1000" step="100" value="120000" required><span>€</span></span></label>
+                <label class="field"><span data-i18n="mortgageBalance">Zostatok hypotéky</span><span class="input-shell"><input id="stressBalance" type="text" inputmode="decimal" data-number data-min="1000" value="120000" required><span>€</span></span></label>
                 <label class="field"><span data-i18n="mortgageTerm">Zostávajúca splatnosť hypotéky</span><span class="input-shell"><input id="stressYears" type="number" min="1" max="40" step="1" value="22" required><span data-i18n="yearsSuffix">rokov</span></span></label>
-                <label class="field"><span data-i18n="referenceRate">Východisková sadzba</span><span class="input-shell"><input id="stressRate" type="number" min="0" max="20" step="0.01" value="3.89" required><span>%</span></span></label>
-                <label class="field"><span data-i18n="householdIncome">Čistý mesačný príjem domácnosti</span><span class="input-shell"><input id="stressIncome" type="number" min="50" step="50" value="2400" required><span>€</span></span><small data-i18n="incomeHelp">Používame ho iba na zobrazenie podielu splátky na príjme.</small></label>
+                <label class="field"><span data-i18n="referenceRate">Východisková sadzba</span><span class="input-shell"><input id="stressRate" type="text" inputmode="decimal" data-number data-min="0" data-max="20" value="3.89" required><span>%</span></span></label>
+                <label class="field"><span data-i18n="householdIncome">Čistý mesačný príjem domácnosti</span><span class="input-shell"><input id="stressIncome" type="text" inputmode="decimal" data-number data-min="50" value="2400" required><span>€</span></span><small data-i18n="incomeHelp">Používame ho iba na zobrazenie podielu splátky na príjme.</small></label>
               </div>
             </section>
           </div>
@@ -339,7 +386,27 @@
                 <div id="stressRows"></div>
               </div>
               <div class="stress-note"><strong data-i18n="stressNoteTitle">Ako čítať výsledok</strong><p data-i18n="stressNote">Podiel splátky na príjme nie je schválenie banky ani univerzálna hranica bezpečia. Nezahŕňa ostatné výdavky, úvery ani finančnú rezervu domácnosti.</p></div>
-              <details><summary data-i18n="calculationTitle">Ako to počítame</summary><p data-i18n="stressMethod">Pre každú sadzbu prepočítame novú anuitnú splátku pri rovnakom zostatku a zostávajúcej splatnosti. Scenáre sú východisková sadzba, potom +1, +2 a +3 percentuálne body.</p></details>
+              <details>
+                <summary data-i18n="calculationTitle">Ako to počítame</summary>
+                <div class="calculation-doc">
+                  <p data-i18n="stressCalcIntro">V každom scenári ponecháme rovnaký zostatok aj zostávajúcu splatnosť. Mení sa iba ročná úroková sadzba.</p>
+                  <h3 data-i18n="calcVariables">Premenné</h3>
+                  <dl>
+                    <dt><var>B</var></dt><dd data-i18n="varPrincipal">aktuálny zostatok istiny</dd>
+                    <dt><var>rⱼ</var></dt><dd data-i18n="varRate">mesačná sadzba = ročná sadzba / 100 / 12</dd>
+                    <dt><var>n</var></dt><dd data-i18n="varTerm">počet mesiacov do konečnej splatnosti</dd>
+                    <dt><var>D</var></dt><dd data-i18n="stressVarIncome">zadaný čistý mesačný príjem domácnosti</dd>
+                  </dl>
+                  <h3 data-i18n="calcPayment">Anuitná splátka</h3>
+                  <div class="formula"><var>Mⱼ</var> = <var>B</var> × <span class="fraction"><span><var>rⱼ</var>(1 + <var>rⱼ</var>)<sup>n</sup></span><span>(1 + <var>rⱼ</var>)<sup>n</sup> − 1</span></span></div>
+                  <p data-i18n="stressCalcZeroRate">Pri nulovej sadzbe použijeme M = B / n.</p>
+                  <h3 data-i18n="stressCalcScenarios">Scenáre sadzby</h3>
+                  <p data-i18n="stressCalcScenariosHelp">Splátku vypočítame pre a, a + 1, a + 2 a a + 3 percentuálne body. Ide o citlivostné scenáre, nie predpoveď sadzieb.</p>
+                  <h3 data-i18n="stressCalcOutputs">Zobrazené rozdiely</h3>
+                  <div class="formula-stack"><code>ΔMⱼ = Mⱼ − M₀</code><code>shareⱼ = Mⱼ / D × 100</code></div>
+                  <p data-i18n="stressCalcOutputsHelp">Zmena splátky je Mⱼ − M₀. Podiel príjmu je Mⱼ / D × 100. Nezahŕňa ostatné výdavky ani dlhy domácnosti.</p>
+                </div>
+              </details>
             </div>
           </aside>
         </div>
