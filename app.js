@@ -689,8 +689,10 @@ function load() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
     const shared = decodeUrlState();
+    const sharedDecision = decodeDecisionUrlState();
     values = { ...defaults, ...stored, ...(shared || {}) };
     if (values.language === "sk" || values.language === "en") currentLanguage = values.language;
+    if (sharedDecision?.language === "sk" || sharedDecision?.language === "en") currentLanguage = sharedDecision.language;
     if (!shared && !stored.maturityDate && stored.yearsLeft) values.maturityDate = addMonthsToToday(stored.yearsLeft * 12);
     if (!shared && !stored.fixationEndDate && stored.monthsToFix) values.fixationEndDate = addMonthsToToday(stored.monthsToFix);
   } catch {
@@ -751,7 +753,7 @@ document.querySelector("#reset-button").addEventListener("click", () => {
 });
 
 const DECISIONS_STORAGE_KEY = "hypo-advisor:decisions:v1";
-const DECISION_URL_STATE_VERSION = 2;
+const DECISION_URL_STATE_VERSION = 3;
 const defaultLoans = [
   { balance: 120000, rate: 3.89, months: 264 },
   { balance: 12000, rate: 8.9, months: 60 },
@@ -767,45 +769,81 @@ function readDecisionState() {
 }
 
 function encodeDecisionUrlState(state) {
-  const compact = {
-    v: DECISION_URL_STATE_VERSION,
-    m: state.activeDecisionMode,
-    l: state.loans.map((loan) => [loan.balance, loan.rate, loan.months, loan.payment]),
-    c: [state.consolidation.rate, state.consolidation.years, state.consolidation.fees, state.consolidation.delayMonths],
-    t: [state.stress.balance, state.stress.years, state.stress.rate, state.stress.income],
-  };
-  return btoa(JSON.stringify(compact)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  const number = (value, multiplier = 1) => Math.round(Number(value) * multiplier).toString(36);
+  const language = currentLanguage === "sk" ? "s" : "e";
+  if (state.activeDecisionMode === "fixation") return `${DECISION_URL_STATE_VERSION}.f.${language}`;
+  if (state.activeDecisionMode === "stress") {
+    const stress = [
+      number(state.stress.balance, 100),
+      number(state.stress.years),
+      number(state.stress.rate, 100),
+      number(state.stress.income, 100),
+    ].join("_");
+    return `${DECISION_URL_STATE_VERSION}.s.${language}.${stress}`;
+  }
+  const loans = state.loans.map((loan) => [
+    number(loan.balance, 100),
+    number(loan.rate, 100),
+    number(loan.months),
+    loan.payment === null ? "-" : number(loan.payment, 100),
+  ].join("_")).join("~");
+  const offer = [
+    number(state.consolidation.rate, 100),
+    number(state.consolidation.years),
+    number(state.consolidation.fees, 100),
+    number(state.consolidation.delayMonths),
+  ].join("_");
+  return `${DECISION_URL_STATE_VERSION}.c.${language}.${loans}.${offer}`;
 }
 
 function decodeDecisionUrlState() {
   const encoded = new URL(location.href).searchParams.get("d");
   if (!encoded || encoded.length > 8000) return null;
   try {
-    const base64 = encoded.replaceAll("-", "+").replaceAll("_", "/");
-    const compact = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")));
     const finite = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
-    if (![1, DECISION_URL_STATE_VERSION].includes(compact.v) || !["fixation", "consolidation", "stress"].includes(compact.m)) return null;
-    if (!Array.isArray(compact.l) || compact.l.length < 1 || compact.l.length > 20) return null;
-    const loans = compact.l.map((loan) => {
-      if (!Array.isArray(loan) || loan.length !== 4) throw new Error("invalid-loan");
-      const [balance, rate, months, payment] = loan;
-      if (!finite(balance, 100, 100000000) || !finite(rate, 0, 30) || !Number.isInteger(months) || !finite(months, 1, 480)) throw new Error("invalid-loan");
-      if (payment !== null && !finite(payment, 0.01, 10000000)) throw new Error("invalid-payment");
-      return { balance, rate, months, payment };
-    });
-    const expectedConsolidationLength = compact.v === 1 ? 3 : 4;
-    if (!Array.isArray(compact.c) || compact.c.length !== expectedConsolidationLength || !Array.isArray(compact.t) || compact.t.length !== 4) return null;
-    const [rate, years, fees] = compact.c;
-    const delayMonths = compact.v === 1 ? 0 : compact.c[3];
-    const [balance, stressYears, stressRate, income] = compact.t;
-    if (!finite(rate, 0, 20) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(fees, 0, 10000000) || !Number.isInteger(delayMonths) || !finite(delayMonths, 0, 479)) return null;
-    if (!finite(balance, 1000, 100000000) || !Number.isInteger(stressYears) || !finite(stressYears, 1, 40) || !finite(stressRate, 0, 20) || !finite(income, 50, 10000000)) return null;
-    return {
-      activeDecisionMode: compact.m,
-      loans,
-      consolidation: { rate, years, fees, delayMonths },
-      stress: { balance, years: stressYears, rate: stressRate, income },
-    };
+    if (encoded.startsWith(`${DECISION_URL_STATE_VERSION}.`)) {
+      const parts = encoded.split(".");
+      const mode = { f: "fixation", c: "consolidation", s: "stress" }[parts[1]];
+      const language = parts[2] === "s" ? "sk" : parts[2] === "e" ? "en" : null;
+      const number = (value, divisor = 1) => /^[0-9a-z]+$/u.test(value) ? parseInt(value, 36) / divisor : Number.NaN;
+      if (!mode || !language) return null;
+      if (mode === "fixation") return parts.length === 3 ? { activeDecisionMode: mode, language } : null;
+      if (mode === "stress") {
+        if (parts.length !== 4) return null;
+        const values = parts[3].split("_");
+        if (values.length !== 4) return null;
+        const balance = number(values[0], 100);
+        const years = number(values[1]);
+        const rate = number(values[2], 100);
+        const income = number(values[3], 100);
+        if (!finite(balance, 1000, 100000000) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(rate, 0, 20) || !finite(income, 50, 10000000)) return null;
+        return { activeDecisionMode: mode, language, stress: { balance, years, rate, income } };
+      }
+      if (parts.length !== 5) return null;
+      const loanParts = parts[3].split("~");
+      if (loanParts.length < 1 || loanParts.length > 20) return null;
+      const loans = loanParts.map((encodedLoan) => {
+        const values = encodedLoan.split("_");
+        if (values.length !== 4) throw new Error("invalid-loan");
+        const balance = number(values[0], 100);
+        const rate = number(values[1], 100);
+        const months = number(values[2]);
+        const payment = values[3] === "-" ? null : number(values[3], 100);
+        if (!finite(balance, 100, 100000000) || !finite(rate, 0, 30) || !Number.isInteger(months) || !finite(months, 1, 480)) throw new Error("invalid-loan");
+        if (payment !== null && !finite(payment, 0.01, 10000000)) throw new Error("invalid-payment");
+        return { balance, rate, months, payment };
+      });
+      const offerValues = parts[4].split("_");
+      if (offerValues.length !== 4) return null;
+      const rate = number(offerValues[0], 100);
+      const years = number(offerValues[1]);
+      const fees = number(offerValues[2], 100);
+      const delayMonths = number(offerValues[3]);
+      if (!finite(rate, 0, 20) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(fees, 0, 10000000) || !Number.isInteger(delayMonths) || !finite(delayMonths, 0, 479)) return null;
+      return { activeDecisionMode: mode, language, loans, consolidation: { rate, years, fees, delayMonths } };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -813,6 +851,17 @@ function decodeDecisionUrlState() {
 
 function updateDecisionUrl(state) {
   const url = new URL(location.href);
+  if (state.activeDecisionMode === "fixation") {
+    try {
+      const values = getValues();
+      values.language = currentLanguage;
+      url.searchParams.set("s", encodeUrlState(values));
+    } catch {
+      // Keep the last valid fixation state while the form is incomplete.
+    }
+  } else {
+    url.searchParams.delete("s");
+  }
   url.searchParams.set("d", encodeDecisionUrlState(state));
   history.replaceState(null, "", url);
 }
@@ -1158,6 +1207,7 @@ function resetDecisionTools() {
 
 function initializeDecisionTools() {
   const state = decodeDecisionUrlState() || readDecisionState();
+  activeDecisionMode = ["fixation", "consolidation", "stress"].includes(state.activeDecisionMode) ? state.activeDecisionMode : "fixation";
   (state.loans?.length ? state.loans : defaultLoans).forEach(addLoan);
   if (state.consolidation) {
     document.querySelector("#conNewRate").value = editableNumber(state.consolidation.rate);
@@ -1188,7 +1238,6 @@ function initializeDecisionTools() {
     event.preventDefault();
     setDecisionMode(next.dataset.mode);
   });
-  activeDecisionMode = ["fixation", "consolidation", "stress"].includes(state.activeDecisionMode) ? state.activeDecisionMode : "fixation";
   updateLoanLabels();
   renderConsolidation();
   renderStressTest();
