@@ -120,6 +120,7 @@ const englishCopy = {
   loanPayment: "Bank payment (optional)",
   consolidationOffer: "Consolidation offer",
   consolidationOfferHelp: "The full debt is spread over the selected term. A longer term can reduce the payment but increase interest.",
+  consolidationDelay: "Consolidate in",
   consolidationRate: "New interest rate",
   consolidationTerm: "New repayment term",
   consolidationFees: "One-off fees",
@@ -140,12 +141,14 @@ const englishCopy = {
   cashflowHelp: "The table uses payments calculated from balance, rate and remaining term. A bank payment entered above is only a consistency check.",
   totalCashOutflow: "Total cash outflow",
   conCalcIntro: "We simulate every loan from its balance, rate and remaining term. The bank payment is only a consistency check and does not change the calculation.",
+  conCalcShift: "First, we move every loan d months forward. Payments and interest before that date are the same in both options, so they are excluded from the comparison.",
   conVarBalance: "current balance of loan i",
   conVarAnnualRate: "annual interest rate of loan i as a percentage",
   conVarMonthlyRate: "monthly rate = aᵢ / 100 / 12",
   conVarMonths: "remaining number of months",
   conVarPayment: "modelled monthly payment calculated from balance, rate and remaining term",
   conVarBankPayment: "optional bank payment, used only to check the inputs",
+  conVarDelay: "number of months until the planned consolidation",
   conCalcPaymentTitle: "Modelled payment for each loan",
   conCalcZeroRate: "At a zero rate, we use Sᵢ = Bᵢ / nᵢ.",
   conCalcMonthTitle: "Every month for every loan",
@@ -748,7 +751,7 @@ document.querySelector("#reset-button").addEventListener("click", () => {
 });
 
 const DECISIONS_STORAGE_KEY = "hypo-advisor:decisions:v1";
-const DECISION_URL_STATE_VERSION = 1;
+const DECISION_URL_STATE_VERSION = 2;
 const defaultLoans = [
   { balance: 120000, rate: 3.89, months: 264 },
   { balance: 12000, rate: 8.9, months: 60 },
@@ -768,7 +771,7 @@ function encodeDecisionUrlState(state) {
     v: DECISION_URL_STATE_VERSION,
     m: state.activeDecisionMode,
     l: state.loans.map((loan) => [loan.balance, loan.rate, loan.months, loan.payment]),
-    c: [state.consolidation.rate, state.consolidation.years, state.consolidation.fees],
+    c: [state.consolidation.rate, state.consolidation.years, state.consolidation.fees, state.consolidation.delayMonths],
     t: [state.stress.balance, state.stress.years, state.stress.rate, state.stress.income],
   };
   return btoa(JSON.stringify(compact)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
@@ -781,7 +784,7 @@ function decodeDecisionUrlState() {
     const base64 = encoded.replaceAll("-", "+").replaceAll("_", "/");
     const compact = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")));
     const finite = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
-    if (compact.v !== DECISION_URL_STATE_VERSION || !["fixation", "consolidation", "stress"].includes(compact.m)) return null;
+    if (![1, DECISION_URL_STATE_VERSION].includes(compact.v) || !["fixation", "consolidation", "stress"].includes(compact.m)) return null;
     if (!Array.isArray(compact.l) || compact.l.length < 1 || compact.l.length > 20) return null;
     const loans = compact.l.map((loan) => {
       if (!Array.isArray(loan) || loan.length !== 4) throw new Error("invalid-loan");
@@ -790,15 +793,17 @@ function decodeDecisionUrlState() {
       if (payment !== null && !finite(payment, 0.01, 10000000)) throw new Error("invalid-payment");
       return { balance, rate, months, payment };
     });
-    if (!Array.isArray(compact.c) || compact.c.length !== 3 || !Array.isArray(compact.t) || compact.t.length !== 4) return null;
+    const expectedConsolidationLength = compact.v === 1 ? 3 : 4;
+    if (!Array.isArray(compact.c) || compact.c.length !== expectedConsolidationLength || !Array.isArray(compact.t) || compact.t.length !== 4) return null;
     const [rate, years, fees] = compact.c;
+    const delayMonths = compact.v === 1 ? 0 : compact.c[3];
     const [balance, stressYears, stressRate, income] = compact.t;
-    if (!finite(rate, 0, 20) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(fees, 0, 10000000)) return null;
+    if (!finite(rate, 0, 20) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(fees, 0, 10000000) || !Number.isInteger(delayMonths) || !finite(delayMonths, 0, 479)) return null;
     if (!finite(balance, 1000, 100000000) || !Number.isInteger(stressYears) || !finite(stressYears, 1, 40) || !finite(stressRate, 0, 20) || !finite(income, 50, 10000000)) return null;
     return {
       activeDecisionMode: compact.m,
       loans,
-      consolidation: { rate, years, fees },
+      consolidation: { rate, years, fees, delayMonths },
       stress: { balance, years: stressYears, rate: stressRate, income },
     };
   } catch {
@@ -821,6 +826,7 @@ function saveDecisionState() {
       rate: readToolNumber(document.querySelector("#conNewRate")),
       years: Number(document.querySelector("#conNewYears").value),
       fees: readToolNumber(document.querySelector("#conFees")),
+      delayMonths: Number(document.querySelector("#conDelayMonths").value),
     },
     stress: {
       balance: readToolNumber(document.querySelector("#stressBalance")),
@@ -887,22 +893,41 @@ function readLoans() {
   }));
 }
 
-function projectLoan(loan) {
-  if (!Number.isFinite(loan.balance) || !Number.isFinite(loan.rate) || !Number.isInteger(loan.months) || loan.balance <= 0 || loan.rate < 0 || loan.months < 1) return null;
-  const payment = monthlyPayment(loan.balance, loan.rate, loan.months);
-  const monthlyRate = loan.rate / 100 / 12;
-
-  let balance = loan.balance;
+function simulateLoanPayments(startBalance, annualRate, payment, months) {
+  const monthlyRate = annualRate / 100 / 12;
+  let balance = startBalance;
   let interest = 0;
   let paid = 0;
-  for (let month = 0; month < loan.months; month += 1) {
+  for (let month = 0; month < months; month += 1) {
     const interestPart = balance * monthlyRate;
     const principalPart = Math.min(payment - interestPart, balance);
     interest += interestPart;
     paid += interestPart + principalPart;
     balance = Math.max(0, balance - principalPart);
   }
-  return { payment, interest, paid, months: loan.months };
+  return { balance, interest, paid };
+}
+
+function projectLoan(loan) {
+  if (!Number.isFinite(loan.balance) || !Number.isFinite(loan.rate) || !Number.isInteger(loan.months) || loan.balance <= 0 || loan.rate < 0 || loan.months < 1) return null;
+  const payment = monthlyPayment(loan.balance, loan.rate, loan.months);
+  const schedule = simulateLoanPayments(loan.balance, loan.rate, payment, loan.months);
+  return { ...schedule, payment, months: loan.months };
+}
+
+function shiftLoan(loan, delayMonths) {
+  const full = projectLoan(loan);
+  if (!full) return null;
+  const elapsedMonths = Math.min(delayMonths, loan.months);
+  const before = simulateLoanPayments(loan.balance, loan.rate, full.payment, elapsedMonths);
+  const remainingMonths = Math.max(0, loan.months - elapsedMonths);
+  if (remainingMonths === 0 || before.balance <= 0.005) return { full, before, after: null };
+  const future = simulateLoanPayments(before.balance, loan.rate, full.payment, remainingMonths);
+  return {
+    full,
+    before,
+    after: { ...future, startBalance: before.balance, payment: full.payment, months: remainingMonths },
+  };
 }
 
 function renderConsolidation() {
@@ -913,14 +938,25 @@ function renderConsolidation() {
   const newRate = readToolNumber(document.querySelector("#conNewRate"));
   const newMonths = Number(document.querySelector("#conNewYears").value) * 12;
   const fees = readToolNumber(document.querySelector("#conFees"));
+  const delayInput = document.querySelector("#conDelayMonths");
+  const delayMonths = Number(delayInput.value);
   const projections = loans.map(projectLoan);
+  const shiftedLoans = loans.map((loan) => shiftLoan(loan, delayMonths));
+  const futureProjections = shiftedLoans.flatMap((shifted) => shifted?.after ? [shifted.after] : []);
   const loanRows = [...document.querySelectorAll(".loan-row")];
   const validLoans = loans.length > 0
     && loans.every((loan) => loan.balance >= 100 && loan.rate >= 0 && loan.rate <= 30 && loan.months >= 1)
-    && projections.every(Boolean);
+    && projections.every(Boolean)
+    && shiftedLoans.every(Boolean);
+  const maximumDelay = validLoans ? Math.max(0, Math.max(...loans.map((loan) => loan.months)) - 1) : 479;
+  delayInput.max = String(maximumDelay);
+  const validDelay = Number.isInteger(delayMonths) && delayMonths >= 0 && delayMonths <= maximumDelay && futureProjections.length > 0;
+  delayInput.setCustomValidity(validDelay ? "" : "invalid-delay");
 
-  if (!formElement.checkValidity() || !validLoans || newRate < 0 || newMonths < 1 || fees < 0) {
-    error.textContent = currentLanguage === "sk" ? "Skontrolujte hodnoty pri všetkých úveroch a v ponuke." : "Check the values for every loan and the consolidation offer.";
+  if (!formElement.checkValidity() || !validLoans || !validDelay || newRate < 0 || newMonths < 1 || fees < 0) {
+    error.textContent = !validDelay && validLoans
+      ? (currentLanguage === "sk" ? "V plánovanom termíne už musel zostať aspoň jeden nesplatený úver." : "At least one loan must still be outstanding on the planned date.")
+      : (currentLanguage === "sk" ? "Skontrolujte hodnoty pri všetkých úveroch a v ponuke." : "Check the values for every loan and the consolidation offer.");
     error.hidden = false;
     content.hidden = true;
     return;
@@ -951,19 +987,30 @@ function renderConsolidation() {
         : `The entered payment matches the ${formatEuro(projection.payment, 2)} model.`;
     }
   });
-  const separatePayment = projections.reduce((sum, projection) => sum + projection.payment, 0);
-  const separateCost = projections.reduce((sum, projection) => sum + projection.interest, 0);
-  const separatePaid = projections.reduce((sum, projection) => sum + projection.paid, 0);
-  const principal = loans.reduce((sum, loan) => sum + loan.balance, 0);
+  const separatePayment = futureProjections.reduce((sum, projection) => sum + projection.payment, 0);
+  const separateCost = futureProjections.reduce((sum, projection) => sum + projection.interest, 0);
+  const separatePaid = futureProjections.reduce((sum, projection) => sum + projection.paid, 0);
+  const principal = futureProjections.reduce((sum, projection) => sum + projection.startBalance, 0);
+  const commonPaid = shiftedLoans.reduce((sum, shifted) => sum + shifted.before.paid, 0);
+  const paidOffBeforeStart = shiftedLoans.filter((shifted) => shifted.after === null).length;
   const combinedPayment = monthlyPayment(principal, newRate, newMonths);
   const combinedProjection = projectLoan({ balance: principal, rate: newRate, months: newMonths, payment: combinedPayment });
   const combinedCost = combinedProjection.interest + fees;
   const combinedPaid = combinedProjection.paid + fees;
   const monthlySaving = separatePayment - combinedPayment;
   const costSaving = separateCost - combinedCost;
-  const oldMonths = Math.max(...projections.map((projection) => projection.months));
+  const oldMonths = Math.max(...futureProjections.map((projection) => projection.months));
   const termDifference = newMonths - oldMonths;
   const comparisonDuration = formatRemainingMonths(Math.max(oldMonths, newMonths));
+  const comparisonStartDate = formatDate(addMonthsToToday(delayMonths));
+
+  document.querySelector("#conDelayHelp").textContent = currentLanguage === "sk"
+    ? (delayMonths === 0
+      ? "Porovnanie začína dnes."
+      : `Porovnanie začne ${comparisonStartDate}. Do tohto termínu modelovo odíde z účtu v oboch možnostiach rovnako ${formatEuro(commonPaid)}.${paidOffBeforeStart ? ` ${paidOffBeforeStart} ${paidOffBeforeStart === 1 ? "úver sa dovtedy splatí" : "úvery sa dovtedy splatia"}.` : ""} Predpokladáme, že dovtedy platia zadané sadzby.`)
+    : (delayMonths === 0
+      ? "The comparison starts today."
+      : `The comparison starts on ${comparisonStartDate}. Until then, the same modelled ${formatEuro(commonPaid)} leaves your account in both options.${paidOffBeforeStart ? ` ${paidOffBeforeStart} ${paidOffBeforeStart === 1 ? "loan is" : "loans are"} repaid before then.` : ""} We assume the entered rates remain in force until that date.`);
 
   const inputNotice = document.querySelector("#conInputNotice");
   inputNotice.hidden = mismatches.length === 0;
@@ -973,22 +1020,25 @@ function renderConsolidation() {
 
   const outcomesConflict = (monthlySaving >= 0) !== (costSaving >= 0);
   document.querySelector("#conDifferenceLabel").textContent = currentLanguage === "sk"
-    ? `Výsledok do úplného splatenia · ${comparisonDuration}`
-    : `Result until fully repaid · ${comparisonDuration}`;
+    ? `Porovnanie od ${delayMonths === 0 ? "dnes" : comparisonStartDate} · ${comparisonDuration}`
+    : `Comparison from ${delayMonths === 0 ? "today" : comparisonStartDate} · ${comparisonDuration}`;
   document.querySelector("#conHeadline").textContent = currentLanguage === "sk"
     ? `Modelová splátka na začiatku ${monthlySaving >= 0 ? "klesne" : "stúpne"} o ${formatEuro(Math.abs(monthlySaving), 2)}, ${outcomesConflict ? "ale" : "a"} za ${comparisonDuration} zaplatíte o ${formatEuro(Math.abs(costSaving))} ${costSaving >= 0 ? "menej" : "viac"}.`
     : `Initially, the modelled payment ${monthlySaving >= 0 ? "falls" : "rises"} by ${formatEuro(Math.abs(monthlySaving), 2)}, ${outcomesConflict ? "but" : "and"} over ${comparisonDuration} you pay ${formatEuro(Math.abs(costSaving))} ${costSaving >= 0 ? "less" : "more"}.`;
   document.querySelector("#conSummary").textContent = currentLanguage === "sk"
-    ? `Do úplného splatenia odíde z účtu ${formatEuro(combinedPaid)} po spojení oproti ${formatEuro(separatePaid)} pri oddelených úveroch.`
-    : `Until fully repaid, ${formatEuro(combinedPaid)} leaves your account after consolidation versus ${formatEuro(separatePaid)} with separate loans.`;
+    ? `Od začiatku porovnania odíde z účtu ${formatEuro(combinedPaid)} po spojení oproti ${formatEuro(separatePaid)} pri oddelených úveroch.${delayMonths > 0 ? ` Spoločných ${formatEuro(commonPaid)} pred týmto termínom výsledok nemení.` : ""}`
+    : `From the comparison start, ${formatEuro(combinedPaid)} leaves your account after consolidation versus ${formatEuro(separatePaid)} with separate loans.${delayMonths > 0 ? ` The shared ${formatEuro(commonPaid)} before that date does not affect the result.` : ""}`;
   document.querySelector("#conSeparatePayment").textContent = formatEuro(separatePayment, 2);
   document.querySelector("#conSeparateCost").textContent = formatEuro(separateCost);
   document.querySelector("#conCombinedPayment").textContent = formatEuro(combinedPayment, 2);
   document.querySelector("#conCombinedCost").textContent = formatEuro(combinedCost);
-  const breakpoints = [...new Set([0, ...projections.map((projection) => projection.months), newMonths])].sort((a, b) => a - b);
+  document.querySelector("#conCashflowTitle").textContent = currentLanguage === "sk"
+    ? `Modelový cashflow od ${delayMonths === 0 ? "dnes" : comparisonStartDate}`
+    : `Modelled cash flow from ${delayMonths === 0 ? "today" : comparisonStartDate}`;
+  const breakpoints = [...new Set([0, ...futureProjections.map((projection) => projection.months), newMonths])].sort((a, b) => a - b);
   document.querySelector("#conCashflowRows").innerHTML = breakpoints.slice(1).map((end, index) => {
     const start = breakpoints[index];
-    const separateCashflow = projections.reduce((sum, projection) => sum + (projection.months > start ? projection.payment : 0), 0);
+    const separateCashflow = futureProjections.reduce((sum, projection) => sum + (projection.months > start ? projection.payment : 0), 0);
     const consolidatedCashflow = newMonths > start ? combinedPayment : 0;
     const period = start + 1 === end
       ? (currentLanguage === "sk" ? `Mesiac ${end}` : `Month ${end}`)
@@ -1006,6 +1056,7 @@ function renderConsolidation() {
   document.querySelector("#conTotalOutflow").textContent = currentLanguage === "sk"
     ? `${formatEuro(separatePaid)} oddelene · ${formatEuro(combinedPaid)} po spojení`
     : `${formatEuro(separatePaid)} separate · ${formatEuro(combinedPaid)} combined`;
+  document.querySelector("#conTotalOutflowLabel").textContent = currentLanguage === "sk" ? "Od začiatku porovnania" : "From comparison start";
   document.querySelector("#conCostDifferenceLabel").textContent = currentLanguage === "sk" ? "Celkovo zaplatíte" : "Total amount paid";
   document.querySelector("#conCostDifference").textContent = currentLanguage === "sk"
     ? `o ${formatEuro(Math.abs(costSaving))} ${costSaving >= 0 ? "menej" : "viac"}`
@@ -1095,6 +1146,7 @@ function resetDecisionTools() {
   document.querySelector("#conNewRate").value = editableNumber(4.1);
   document.querySelector("#conNewYears").value = 22;
   document.querySelector("#conFees").value = 300;
+  document.querySelector("#conDelayMonths").value = 0;
   document.querySelector("#stressBalance").value = 120000;
   document.querySelector("#stressYears").value = 22;
   document.querySelector("#stressRate").value = editableNumber(3.89);
@@ -1111,6 +1163,7 @@ function initializeDecisionTools() {
     document.querySelector("#conNewRate").value = editableNumber(state.consolidation.rate);
     document.querySelector("#conNewYears").value = state.consolidation.years;
     document.querySelector("#conFees").value = editableNumber(state.consolidation.fees);
+    document.querySelector("#conDelayMonths").value = state.consolidation.delayMonths ?? 0;
   }
   if (state.stress) {
     document.querySelector("#stressBalance").value = editableNumber(state.stress.balance);
