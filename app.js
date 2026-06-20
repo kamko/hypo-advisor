@@ -15,6 +15,7 @@ const defaults = {
   currentRate: 1.49,
   currentPayment: null,
   fixationEndDate: addMonthsToToday(8),
+  refixDelayMonths: 0,
   rateNow: 3.89,
   futureRate: 3.49,
   switchCost: 0,
@@ -32,7 +33,7 @@ let currentLanguage = navigator.language.toLowerCase().startsWith("sk") ? "sk" :
 const englishCopy = {
   privacy: "Data stays on this device",
   context: "Decision before the fixed-rate period ends",
-  title: "Refix today or wait?",
+  title: "Refix earlier or wait?",
   intro: "Compare both options over the same time horizon. No registration and no recommendation that hides its assumptions.",
   mortgageTitle: "Your mortgage today",
   mortgageHelp: "You can find these values in online banking or your loan agreement.",
@@ -44,9 +45,11 @@ const englishCopy = {
   fixationEnd: "Current fixed-rate period ends",
   assumptionsTitle: "Comparison assumptions",
   assumptionsHelp: "The future rate is only an estimate. Below, you can see the rate at which the result changes.",
-  rateNow: "Rate if you refix today",
+  refixDelay: "Move today forward by",
+  monthsSuffix: "mo.",
+  rateNow: "Rate if you refix on that date",
   futureRate: "Expected rate after the fixed period",
-  switchCost: "Cost of switching today",
+  switchCost: "Cost of the earlier refix",
   switchCostHelp: "For example, a bank fee or property valuation.",
   horizon: "Comparison horizon",
   yearsSuffix: "years",
@@ -70,27 +73,31 @@ const englishCopy = {
   balanceAfter: "Balance after the horizon",
   currentFixation: "Current fixed rate",
   newRate: "New rate",
+  earlyRefix: "Earlier refix",
+  scheduledFix: "Scheduled fixed-rate end",
   breakEven: "Break-even future rate",
   breakEvenHelp: "If the rate after the fixed period is around this level, both scenarios will cost the same.",
   calculationTitle: "How we calculate it",
   calculationHelp: "If you wait, we use your current payment until the fixed period ends and the new payment afterwards. If you refix today, we use the new payment from today. Each payment is split into interest and principal. Only principal reduces the outstanding balance.",
   calcIntro: "We use a standard annuity model with monthly compounding. Calculations run without intermediate rounding.",
+  calcShift: "First, we project the mortgage d months forward. This common period is excluded from the comparison; both scenarios start with the same balance Bₑ on the shifted date.",
   calcVariables: "Variables",
   varPrincipal: "current outstanding principal",
   varRate: "monthly rate = annual rate / 100 / 12",
   varTerm: "number of months until final maturity",
   varFixation: "number of months until the current fixed-rate period ends",
+  varDelay: "number of months until the shifted comparison start",
   varHorizon: "comparison horizon in months",
   calcPayment: "Annuity payment",
   calcZeroRate: "For a zero rate, we use M = P / n.",
   calcMonthly: "Each month",
   calcMonthlyHelp: "I is interest, A is principal repaid and B is the outstanding balance. If you enter the current payment from your bank, we use it instead of the calculated M for the first k months.",
   calcScenarios: "Scenarios",
-  calcNow: "Refix today: we calculate the new payment from balance P, today's available rate and the remaining n months. We simulate min(h, n) months.",
+  calcNow: "Refix earlier: for the first d months, we use the current rate and payment. From balance Bₑ, we then calculate a new payment at the earlier refix rate over the remaining n − d months.",
   calcWait: "Wait: for the first k months, we use the current rate and current payment. From balance Bₖ, we then calculate a new payment at the expected rate over the remaining n − k months.",
   calcOutputs: "Outputs",
-  calcOutflow: "Total paid from your account = all payments within the horizon + the cost of switching today.",
-  calcCost: "Interest and fees = sum of Iₜ + the cost of switching today. Principal repaid is not a cost.",
+  calcOutflow: "Total paid from your account = all payments within the horizon + the cost of the earlier refix.",
+  calcCost: "Interest and fees = sum of Iₜ + the cost of the earlier refix. Principal repaid is not a cost.",
   calcPrincipal: "Principal repaid = P − Bₕ.",
   calcBalance: "Balance after the horizon = Bₕ.",
   calcBreakEven: "Break-even rate",
@@ -119,6 +126,7 @@ const messages = {
     fixationFuture: "Koniec aktuálnej fixácie musí byť v budúcnosti.",
     fixationBeforeMaturity: "Koniec fixácie musí nastať pred konečnou splatnosťou hypotéky.",
     horizonAfterFixation: "Horizont porovnania musí siahať za koniec aktuálnej fixácie.",
+    delayBeforeFixation: "Posunutý dnešok musí byť pred riadnym koncom fixácie.",
     waitCheaper: "Počkať",
     nowCheaper: "Refixovať dnes",
     equal: "Rovnaké náklady",
@@ -134,6 +142,7 @@ const messages = {
     fixationFuture: "The current fixed-rate period must end in the future.",
     fixationBeforeMaturity: "The fixed-rate period must end before the mortgage matures.",
     horizonAfterFixation: "The comparison horizon must extend beyond the current fixed-rate period.",
+    delayBeforeFixation: "The shifted start date must be before the current fixed-rate period ends.",
     waitCheaper: "Wait",
     nowCheaper: "Refix today",
     equal: "Equal cost",
@@ -155,6 +164,7 @@ const urlKeys = {
   futureRate: "fr",
   switchCost: "sc",
   horizonYears: "hy",
+  refixDelayMonths: "rd",
   language: "l",
 };
 
@@ -227,25 +237,36 @@ function simulate(principal, annualRate, totalMonths, monthsToRun, paymentOverri
   return { balance, interest, payment, paid };
 }
 
+function comparisonStart(values) {
+  const delay = Math.min(values.refixDelayMonths, values.totalMonths);
+  const projected = simulate(values.balance, values.currentRate, values.totalMonths, delay, values.currentPayment);
+  return {
+    balance: projected.balance,
+    totalMonths: values.totalMonths - delay,
+    monthsToFix: Math.max(0, values.monthsToFix - delay),
+  };
+}
+
 function scenarioNow(values) {
-  const totalMonths = values.totalMonths;
-  const horizonMonths = Math.min(values.horizonYears * 12, totalMonths);
-  const period = simulate(values.balance, values.rateNow, totalMonths, horizonMonths);
+  const start = comparisonStart(values);
+  const horizonMonths = Math.min(values.horizonYears * 12, start.totalMonths);
+  const period = simulate(start.balance, values.rateNow, start.totalMonths, horizonMonths);
   return {
     cost: period.interest + values.switchCost,
     paid: period.paid + values.switchCost,
     payment: period.payment,
     balance: period.balance,
+    startBalance: start.balance,
   };
 }
 
 function scenarioWait(values, futureRate = values.futureRate) {
-  const totalMonths = values.totalMonths;
-  const horizonMonths = Math.min(values.horizonYears * 12, totalMonths);
-  const firstMonths = Math.min(values.monthsToFix, horizonMonths);
-  const first = simulate(values.balance, values.currentRate, totalMonths, firstMonths, values.currentPayment);
+  const start = comparisonStart(values);
+  const horizonMonths = Math.min(values.horizonYears * 12, start.totalMonths);
+  const firstMonths = Math.min(start.monthsToFix, horizonMonths);
+  const first = simulate(start.balance, values.currentRate, start.totalMonths, firstMonths, values.currentPayment);
   const remainingHorizon = horizonMonths - firstMonths;
-  const remainingTerm = totalMonths - firstMonths;
+  const remainingTerm = start.totalMonths - firstMonths;
   const second = simulate(first.balance, futureRate, remainingTerm, remainingHorizon);
 
   return {
@@ -254,6 +275,7 @@ function scenarioWait(values, futureRate = values.futureRate) {
     paymentBefore: first.payment,
     paymentAfter: second.payment,
     balance: second.balance,
+    startBalance: start.balance,
   };
 }
 
@@ -283,6 +305,7 @@ function getValues() {
   }));
   values.totalMonths = monthsUntil(values.maturityDate);
   values.monthsToFix = monthsUntil(values.fixationEndDate);
+  document.querySelector("#refixDelayMonths").max = String(Math.max(0, values.monthsToFix - 1));
   return values;
 }
 
@@ -333,6 +356,9 @@ function formatRemainingMonths(months) {
 }
 
 function validate(values) {
+  if (Number.isFinite(values.refixDelayMonths) && values.monthsToFix > 0 && values.refixDelayMonths >= values.monthsToFix) {
+    return message("delayBeforeFixation");
+  }
   if (!form.checkValidity()) return message("invalid");
   if (values.totalMonths < 1) return message("maturityFuture");
   if (values.monthsToFix < 1) return message("fixationFuture");
@@ -342,7 +368,7 @@ function validate(values) {
       : "The current payment must be higher than the monthly interest.";
   }
   if (parseLocalDate(values.fixationEndDate) >= parseLocalDate(values.maturityDate)) return message("fixationBeforeMaturity");
-  if (values.horizonYears * 12 <= values.monthsToFix) return message("horizonAfterFixation");
+  if (values.horizonYears * 12 <= values.monthsToFix - values.refixDelayMonths) return message("horizonAfterFixation");
   return "";
 }
 
@@ -356,6 +382,23 @@ function pluralMonths(value) {
 function pluralYears(value) {
   if (currentLanguage === "en") return `${value} ${value === 1 ? "year" : "years"}`;
   return `${value} ${value === 1 ? "rok" : value < 5 ? "roky" : "rokov"}`;
+}
+
+function refixScenarioLabel(months, short = false) {
+  if (currentLanguage === "en") {
+    if (months === 0) return short ? "Refix today" : "Refix today";
+    return `Refix in ${pluralMonths(months)}`;
+  }
+  if (months === 0) return short ? "Refix dnes" : "Refixovať dnes";
+  return `${short ? "Refix" : "Refixovať"} o ${pluralMonths(months)}`;
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat(numberLocale(), {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(parseLocalDate(value));
 }
 
 function save(values) {
@@ -372,12 +415,13 @@ function encodeUrlState(values) {
   const number = (value, multiplier = 1) => Math.round(Number(value) * multiplier).toString(36);
   const date = (value) => Number(value.replaceAll("-", "")).toString(36);
   return [
-    2,
+    3,
     number(values.balance, 100),
     date(values.maturityDate),
     number(values.currentRate, 100),
     date(values.fixationEndDate),
     values.currentPayment ? number(values.currentPayment, 100) : "-",
+    number(values.refixDelayMonths),
     number(values.rateNow, 100),
     number(values.futureRate, 100),
     number(values.switchCost, 100),
@@ -391,11 +435,14 @@ function decodeUrlState() {
   if (encoded) {
     try {
       const parts = encoded.split(".");
-      if (parts.length !== 11 || parts[0] !== "2") return null;
-      const numericPartsAreValid = parts.slice(1, 10).every((part, index) => (
+      const isVersion3 = parts[0] === "3" && parts.length === 12;
+      const isVersion2 = parts[0] === "2" && parts.length === 11;
+      if (!isVersion3 && !isVersion2) return null;
+      const languageIndex = isVersion3 ? 11 : 10;
+      const numericPartsAreValid = parts.slice(1, languageIndex).every((part, index) => (
         index === 4 ? /^(?:-|[0-9a-z]+)$/u.test(part) : /^[0-9a-z]+$/u.test(part)
       ));
-      if (!numericPartsAreValid || !/^[se]$/u.test(parts[10])) return null;
+      if (!numericPartsAreValid || !/^[se]$/u.test(parts[languageIndex])) return null;
       const number = (value, divisor = 1) => parseInt(value, 36) / divisor;
       const date = (value) => {
         const raw = String(parseInt(value, 36)).padStart(8, "0");
@@ -407,11 +454,12 @@ function decodeUrlState() {
         currentRate: number(parts[3], 100),
         fixationEndDate: date(parts[4]),
         currentPayment: parts[5] === "-" ? null : number(parts[5], 100),
-        rateNow: number(parts[6], 100),
-        futureRate: number(parts[7], 100),
-        switchCost: number(parts[8], 100),
-        horizonYears: number(parts[9]),
-        language: parts[10] === "s" ? "sk" : "en",
+        refixDelayMonths: isVersion3 ? number(parts[6]) : 0,
+        rateNow: number(parts[isVersion3 ? 7 : 6], 100),
+        futureRate: number(parts[isVersion3 ? 8 : 7], 100),
+        switchCost: number(parts[isVersion3 ? 9 : 8], 100),
+        horizonYears: number(parts[isVersion3 ? 10 : 9]),
+        language: parts[languageIndex] === "s" ? "sk" : "en",
       };
     } catch {
       return null;
@@ -451,13 +499,15 @@ function render() {
 
   const now = scenarioNow(values);
   const wait = scenarioWait(values);
+  const start = comparisonStart(values);
+  const shiftedDate = addMonthsToToday(values.refixDelayMonths);
   const duration = pluralYears(values.horizonYears);
   const waitHasLowerCost = wait.cost <= now.cost;
   const subject = waitHasLowerCost ? wait : now;
   const other = waitHasLowerCost ? now : wait;
   const subjectName = currentLanguage === "sk"
-    ? (waitHasLowerCost ? "Čakanie" : "Refixácia dnes")
-    : (waitHasLowerCost ? "Waiting" : "Refixing today");
+    ? (waitHasLowerCost ? "Čakanie" : refixScenarioLabel(values.refixDelayMonths, true))
+    : (waitHasLowerCost ? "Waiting" : refixScenarioLabel(values.refixDelayMonths, true));
   const costAdvantage = Math.abs(other.cost - subject.cost);
   const cashAdvantage = other.paid - subject.paid;
   const balanceAdvantage = other.balance - subject.balance;
@@ -469,12 +519,8 @@ function render() {
     : (balanceAdvantage >= 0 ? "lower" : "higher");
 
   document.querySelector("#difference-label").textContent = currentLanguage === "sk"
-    ? (values.horizonYears === 1
-      ? "Za najbližší rok"
-      : values.horizonYears < 5
-        ? `Za najbližšie ${values.horizonYears} roky`
-        : `Za najbližších ${values.horizonYears} rokov`)
-    : `Over the next ${duration}`;
+    ? `Počas ${values.horizonYears} ${values.horizonYears === 1 ? "roka" : "rokov"} od ${formatDate(shiftedDate)}`
+    : `Over ${duration} from ${formatDate(shiftedDate)}`;
   const headlineSubject = document.querySelector("#headline-subject");
   const headlineAction = document.querySelector("#headline-action");
   const headlineAmount = document.querySelector("#headline-amount");
@@ -510,7 +556,9 @@ function render() {
   document.querySelector("#now-cost").textContent = formatEuro(now.cost);
   document.querySelector("#wait-payment").textContent = `${formatEuro(wait.paymentBefore, 2)} → ${formatEuro(wait.paymentAfter, 2)}`;
   document.querySelector("#wait-cost").textContent = formatEuro(wait.cost);
-  document.querySelector("#wait-months-label").textContent = pluralMonths(values.monthsToFix);
+  document.querySelector("#refix-scenario-name").textContent = refixScenarioLabel(values.refixDelayMonths);
+  document.querySelector("#refix-short-name").textContent = refixScenarioLabel(values.refixDelayMonths, true);
+  document.querySelector("#wait-months-label").textContent = pluralMonths(start.monthsToFix);
   document.querySelector("#current-payment-source").textContent = values.currentPayment
     ? (currentLanguage === "sk" ? "Splátka z banky" : "Payment from bank")
     : (currentLanguage === "sk" ? "Anuitný odhad" : "Annuity estimate");
@@ -520,18 +568,27 @@ function render() {
   document.querySelector("#scenario-wait-row").classList.remove("is-cheaper");
   document.querySelector("#now-paid").textContent = formatEuro(now.paid);
   document.querySelector("#wait-paid").textContent = formatEuro(wait.paid);
-  document.querySelector("#now-principal-paid").textContent = formatEuro(values.balance - now.balance);
-  document.querySelector("#wait-principal-paid").textContent = formatEuro(values.balance - wait.balance);
+  document.querySelector("#now-principal-paid").textContent = formatEuro(start.balance - now.balance);
+  document.querySelector("#wait-principal-paid").textContent = formatEuro(start.balance - wait.balance);
   document.querySelector("#now-balance").textContent = formatEuro(now.balance);
   document.querySelector("#wait-balance").textContent = formatEuro(wait.balance);
 
   const breakEven = findBreakEven(values, now.cost);
   document.querySelector("#break-even-rate").textContent = breakEven === null ? "> 20 %" : `${formatPercent(breakEven)} %`;
 
-  document.querySelector("#fix-point-label").textContent = currentLanguage === "sk" ? `O ${values.monthsToFix} mes.` : `In ${pluralMonths(values.monthsToFix)}`;
-  document.querySelector("#horizon-label").textContent = currentLanguage === "sk" ? `O ${values.horizonYears} r.` : `In ${pluralYears(values.horizonYears)}`;
-  const marker = Math.min(100, values.monthsToFix / (values.horizonYears * 12) * 100);
-  document.querySelector(".timeline-track").style.setProperty("--marker", `${marker}%`);
+  document.querySelector("#refix-delay-help").textContent = currentLanguage === "sk"
+    ? `Porovnanie začne ${formatDate(shiftedDate)}. Najprv odhadneme zostatok k tomuto dátumu.`
+    : `The comparison starts on ${formatDate(shiftedDate)}. We first estimate the balance on that date.`;
+  document.querySelector("#refix-point-label").textContent = currentLanguage === "sk"
+    ? `${refixScenarioLabel(values.refixDelayMonths, true)} · Fix o ${values.monthsToFix} mes.`
+    : `${refixScenarioLabel(values.refixDelayMonths, true)} · Fix in ${pluralMonths(values.monthsToFix)}`;
+  document.querySelector("#horizon-label").textContent = currentLanguage === "sk" ? `Horizont +${values.horizonYears} r.` : `Horizon +${pluralYears(values.horizonYears)}`;
+  const timelineMonths = values.refixDelayMonths + values.horizonYears * 12;
+  const refixMarker = Math.min(100, values.refixDelayMonths / timelineMonths * 100);
+  const fixMarker = Math.min(100, values.monthsToFix / timelineMonths * 100);
+  const timelineTrack = document.querySelector(".timeline-track");
+  timelineTrack.style.setProperty("--refix-marker", `${refixMarker}%`);
+  timelineTrack.style.setProperty("--fix-marker", `${fixMarker}%`);
 
   save(values);
 }

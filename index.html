@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Porovnanie refixácie hypotéky dnes a čakania do konca fixácie." />
+    <meta name="description" content="Porovnanie skoršej refixácie hypotéky a čakania do konca fixácie." />
     <title>Hypo Advisor</title>
     <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&amp;display=swap&amp;subset=latin-ext" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css?v=11" />
-    <script src="app.js?v=11" defer></script>
+    <script src="app.js?v=12" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -33,7 +33,7 @@
     <main id="top">
       <section class="intro" aria-labelledby="page-title">
         <p class="context-label" data-i18n="context">Rozhodovanie pred koncom fixácie</p>
-        <h1 id="page-title" data-i18n="title">Refixovať dnes alebo počkať?</h1>
+        <h1 id="page-title" data-i18n="title">Refixovať skôr alebo počkať?</h1>
         <p data-i18n="intro">Porovnajte si obe možnosti na rovnakom časovom horizonte. Bez registrácie a bez odporúčania, ktoré by skrývalo predpoklady.</p>
       </section>
 
@@ -87,7 +87,12 @@
 
               <div class="field-grid">
                 <label class="field">
-                  <span data-i18n="rateNow">Sadzba pri refixácii dnes</span>
+                  <span data-i18n="refixDelay">Posunúť dnešok o</span>
+                  <span class="input-shell"><input id="refixDelayMonths" name="refixDelayMonths" type="number" min="0" step="1" inputmode="numeric" value="0" required /><span data-i18n="monthsSuffix">mes.</span></span>
+                  <small id="refix-delay-help">Najprv odhadneme zostatok v tomto termíne a až potom porovnáme scenáre.</small>
+                </label>
+                <label class="field">
+                  <span data-i18n="rateNow">Sadzba pri refixácii v tomto termíne</span>
                   <span class="input-shell"><input id="rateNow" name="rateNow" type="text" inputmode="decimal" data-number data-min="0" data-max="20" value="3.89" required /><span>%</span></span>
                 </label>
                 <label class="field">
@@ -95,7 +100,7 @@
                   <span class="input-shell"><input id="futureRate" name="futureRate" type="text" inputmode="decimal" data-number data-min="0" data-max="20" value="3.49" required /><span>%</span></span>
                 </label>
                 <label class="field">
-                  <span data-i18n="switchCost">Náklady na zmenu dnes</span>
+                  <span data-i18n="switchCost">Náklady na skoršiu refixáciu</span>
                   <span class="input-shell"><input id="switchCost" name="switchCost" type="text" inputmode="decimal" data-number data-min="0" value="0" required /><span>€</span></span>
                   <small data-i18n="switchCostHelp">Napr. poplatok banke alebo za znalecký posudok.</small>
                 </label>
@@ -142,7 +147,7 @@
                   <span role="columnheader" data-i18n="interestFees">Úroky + poplatky</span>
                 </div>
                 <div id="scenario-now-row" class="scenario-row" role="row">
-                  <span role="cell"><i class="scenario-dot now"></i><span data-i18n="refixNow">Refixovať dnes</span></span>
+                  <span role="cell"><i class="scenario-dot now"></i><span id="refix-scenario-name">Refixovať dnes</span></span>
                   <strong id="now-payment" role="cell">—</strong>
                   <strong id="now-cost" role="cell">—</strong>
                 </div>
@@ -156,7 +161,7 @@
               <div class="balance-table" role="table" aria-label="Peňažný tok a zostávajúci dlh">
                 <div class="balance-row balance-head" role="row">
                   <span role="columnheader"></span>
-                  <span role="columnheader" data-i18n="refixShort">Refix dnes</span>
+                  <span id="refix-short-name" role="columnheader">Refix dnes</span>
                   <span role="columnheader" data-i18n="wait">Počkať</span>
                 </div>
                 <div class="balance-row" role="row">
@@ -177,9 +182,9 @@
               </div>
 
               <div class="timeline" aria-label="Priebeh scenárov v čase">
-                <div class="timeline-labels"><span data-i18n="today">Dnes</span><span id="fix-point-label">O 8 mes.</span><span id="horizon-label">O 3 r.</span></div>
-                <div class="timeline-track"><span id="fix-marker"></span></div>
-                <div class="timeline-copy"><span data-i18n="currentFixation">Aktuálna fixácia</span><span data-i18n="newRate">Nová sadzba</span></div>
+                <div class="timeline-labels"><span data-i18n="today">Dnes</span><span id="refix-point-label">Refix dnes · Fix o 8 mes.</span><span id="horizon-label">O 3 r.</span></div>
+                <div class="timeline-track"><span id="refix-marker" class="refix-marker"></span><span id="fix-marker" class="fix-marker"></span></div>
+                <div class="timeline-copy"><span data-i18n="earlyRefix">Skoršia refixácia</span><span data-i18n="scheduledFix">Riadny koniec fixácie</span></div>
               </div>
 
               <div class="break-even">
@@ -194,6 +199,7 @@
                 <summary data-i18n="calculationTitle">Ako to počítame</summary>
                 <div class="calculation-doc">
                   <p data-i18n="calcIntro">Používame štandardný anuitný model s mesačným úročením. Výpočet prebieha bez priebežného zaokrúhľovania.</p>
+                  <p data-i18n="calcShift">Najprv premietneme hypotéku o d mesiacov dopredu. Toto spoločné obdobie nie je súčasťou porovnania; oba scenáre začínajú rovnakým zostatkom Bₑ v posunutom termíne.</p>
 
                   <h3 data-i18n="calcVariables">Premenné</h3>
                   <dl>
@@ -201,6 +207,7 @@
                     <dt><var>r</var></dt><dd data-i18n="varRate">mesačná sadzba = ročná sadzba / 100 / 12</dd>
                     <dt><var>n</var></dt><dd data-i18n="varTerm">počet mesiacov do konečnej splatnosti</dd>
                     <dt><var>k</var></dt><dd data-i18n="varFixation">počet mesiacov do konca aktuálnej fixácie</dd>
+                    <dt><var>d</var></dt><dd data-i18n="varDelay">počet mesiacov do skoršej refixácie</dd>
                     <dt><var>h</var></dt><dd data-i18n="varHorizon">horizont porovnania v mesiacoch</dd>
                   </dl>
 
@@ -218,14 +225,14 @@
 
                   <h3 data-i18n="calcScenarios">Scenáre</h3>
                   <ol>
-                    <li data-i18n="calcNow"><strong>Refixovať dnes:</strong> novú splátku vypočítame zo zostatku P, sadzby dostupnej dnes a zostávajúcich n mesiacov. Simulujeme min(h, n) mesiacov.</li>
+                    <li data-i18n="calcNow"><strong>Refixovať skôr:</strong> prvých d mesiacov použijeme aktuálnu sadzbu a splátku. Potom zo zostatku Bₑ vypočítame novú splátku pri sadzbe skoršej refixácie na zostávajúcich n − d mesiacov.</li>
                     <li data-i18n="calcWait"><strong>Počkať:</strong> prvých k mesiacov použijeme aktuálnu sadzbu a aktuálnu splátku. Zo zostatku Bₖ potom vypočítame novú splátku pri očakávanej sadzbe na zostávajúcich n − k mesiacov.</li>
                   </ol>
 
                   <h3 data-i18n="calcOutputs">Výstupy</h3>
                   <ul>
-                    <li data-i18n="calcOutflow"><strong>Spolu odíde z účtu</strong> = súčet všetkých splátok v horizonte + náklady na zmenu dnes.</li>
-                    <li data-i18n="calcCost"><strong>Úroky a poplatky</strong> = súčet Iₜ + náklady na zmenu dnes. Splatená istina nie je náklad.</li>
+                    <li data-i18n="calcOutflow"><strong>Spolu odíde z účtu</strong> = súčet všetkých splátok v horizonte + náklady na skoršiu refixáciu.</li>
+                    <li data-i18n="calcCost"><strong>Úroky a poplatky</strong> = súčet Iₜ + náklady na skoršiu refixáciu. Splatená istina nie je náklad.</li>
                     <li data-i18n="calcPrincipal"><strong>Splatená istina</strong> = P − Bₕ.</li>
                     <li data-i18n="calcBalance"><strong>Zostatok po horizonte</strong> = Bₕ.</li>
                   </ul>
