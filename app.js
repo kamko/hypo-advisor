@@ -162,8 +162,10 @@ const englishCopy = {
   householdIncome: "Household net monthly income",
   incomeHelp: "We use it only to show the payment as a share of income.",
   scenarioCount: "Number of scenarios",
-  variantsSuffix: "variants",
-  scenarioCountHelp: "Including the starting rate; each additional scenario adds 1 percentage point.",
+  scenarioCountHelp: "Including the starting rate.",
+  rateStep: "Rate step",
+  percentagePointsSuffix: "pp",
+  rateStepHelp: "The rate increases by this amount in each additional scenario.",
   stressResult: "Payment resilience",
   highestScenario: "At the highest scenario",
   rate: "Rate",
@@ -171,12 +173,12 @@ const englishCopy = {
   incomeShare: "Of income",
   stressNoteTitle: "How to read the result",
   stressNote: "The share of income is neither bank approval nor a universal safety limit. It excludes other expenses, loans and the household's financial reserve.",
-  stressMethod: "For each rate, we recalculate the annuity payment using the same balance and remaining term. Each additional scenario adds 1 percentage point.",
+  stressMethod: "For each rate, we recalculate the annuity payment using the same balance and remaining term. Each additional scenario adds the selected rate step.",
   stressCalcIntro: "For every scenario, the balance and remaining term stay unchanged. Only the annual interest rate changes.",
   stressVarIncome: "entered household net monthly income",
   stressCalcScenarios: "Rate scenarios",
   stressCalcZeroRate: "At a zero rate, we use M = B / n.",
-  stressCalcScenariosHelp: "We start at rate a; each additional scenario adds 1 percentage point. These are sensitivity scenarios, not a rate forecast.",
+  stressCalcScenariosHelp: "We start at rate a; each additional scenario adds the selected step. These are sensitivity scenarios, not a rate forecast.",
   stressCalcOutputs: "Displayed differences",
   stressCalcOutputsHelp: "Payment change is Mⱼ − M₀. Income share is Mⱼ / D × 100. It does not include other household expenses or debts.",
   mortgageBalance: "Outstanding mortgage balance",
@@ -761,6 +763,7 @@ const defaultLoans = [
   { balance: 120000, rate: 3.89, months: 264 },
   { balance: 12000, rate: 8.9, months: 60 },
 ];
+const stressStepSizes = [0.25, 0.5, 0.75, 1, 1.5, 2];
 let activeDecisionMode = "fixation";
 
 function readDecisionState() {
@@ -782,6 +785,7 @@ function encodeDecisionUrlState(state) {
       number(state.stress.rate, 100),
       number(state.stress.income, 100),
       number(state.stress.variantCount),
+      number(state.stress.stepSize, 100),
     ].join("_");
     return `${DECISION_URL_STATE_VERSION}.s.${language}.${stress}`;
   }
@@ -790,7 +794,7 @@ function encodeDecisionUrlState(state) {
     number(loan.rate, 100),
     number(loan.months),
     loan.payment === null ? "-" : number(loan.payment, 100),
-  ].join("_")).join("~");
+  ].join("_")).join("L");
   const offer = [
     number(state.consolidation.rate, 100),
     number(state.consolidation.years),
@@ -815,17 +819,18 @@ function decodeDecisionUrlState() {
       if (mode === "stress") {
         if (parts.length !== 4) return null;
         const values = parts[3].split("_");
-        if (![4, 5].includes(values.length)) return null;
+        if (![4, 5, 6].includes(values.length)) return null;
         const balance = number(values[0], 100);
         const years = number(values[1]);
         const rate = number(values[2], 100);
         const income = number(values[3], 100);
-        const variantCount = values.length === 5 ? number(values[4]) : 4;
-        if (!finite(balance, 1000, 100000000) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(rate, 0, 20) || !finite(income, 50, 10000000) || !Number.isInteger(variantCount) || !finite(variantCount, 3, 6)) return null;
-        return { activeDecisionMode: mode, language, stress: { balance, years, rate, income, variantCount } };
+        const variantCount = values.length >= 5 ? number(values[4]) : 4;
+        const stepSize = values.length === 6 ? number(values[5], 100) : 1;
+        if (!finite(balance, 1000, 100000000) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(rate, 0, 20) || !finite(income, 50, 10000000) || !Number.isInteger(variantCount) || !finite(variantCount, 2, 10) || !stressStepSizes.includes(stepSize)) return null;
+        return { activeDecisionMode: mode, language, stress: { balance, years, rate, income, variantCount, stepSize } };
       }
       if (parts.length !== 5) return null;
-      const loanParts = parts[3].split("~");
+      const loanParts = parts[3].replaceAll("~", "L").split("L");
       if (loanParts.length < 1 || loanParts.length > 20) return null;
       const loans = loanParts.map((encodedLoan) => {
         const values = encodedLoan.split("_");
@@ -888,6 +893,7 @@ function saveDecisionState() {
       rate: readToolNumber(document.querySelector("#stressRate")),
       income: readToolNumber(document.querySelector("#stressIncome")),
       variantCount: Number(document.querySelector("#stressVariantCount").value),
+      stepSize: Number(document.querySelector("#stressStepSize").value),
     },
   };
   localStorage.setItem(DECISIONS_STORAGE_KEY, JSON.stringify(state));
@@ -1133,8 +1139,9 @@ function renderStressTest() {
   const baseRate = readToolNumber(document.querySelector("#stressRate"));
   const income = readToolNumber(document.querySelector("#stressIncome"));
   const variantCount = Number(document.querySelector("#stressVariantCount").value);
+  const stepSize = Number(document.querySelector("#stressStepSize").value);
 
-  if (!formElement.checkValidity() || balance < 1000 || months < 1 || baseRate < 0 || income <= 0 || !Number.isInteger(variantCount) || variantCount < 3 || variantCount > 6) {
+  if (!formElement.checkValidity() || balance < 1000 || months < 1 || baseRate < 0 || income <= 0 || !Number.isInteger(variantCount) || variantCount < 2 || variantCount > 10 || !stressStepSizes.includes(stepSize)) {
     error.textContent = currentLanguage === "sk" ? "Skontrolujte hodnoty hypotéky a príjmu." : "Check the mortgage and income values.";
     error.hidden = false;
     content.hidden = true;
@@ -1143,7 +1150,19 @@ function renderStressTest() {
 
   error.hidden = true;
   content.hidden = false;
-  const scenarios = Array.from({ length: variantCount }, (_, increase) => {
+  document.querySelector("#stressVariantCountOutput").value = variantCount;
+  const formattedStep = new Intl.NumberFormat(numberLocale(), { maximumFractionDigits: 2 }).format(stepSize);
+  document.querySelectorAll("#stressStepSize option").forEach((option) => {
+    option.textContent = new Intl.NumberFormat(numberLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(option.value));
+  });
+  document.querySelector("#stressScenarioHelp").textContent = currentLanguage === "sk"
+    ? `Vrátane východiskovej sadzby; ďalšie rastú po ${formattedStep} p. b.`
+    : `Including the starting rate; each next scenario rises by ${formattedStep} pp.`;
+  document.querySelector("#stressCalcScenariosHelp").textContent = currentLanguage === "sk"
+    ? `Začíname sadzbou a; každý ďalší scenár pridá ${formattedStep} p. b. Ide o citlivostné scenáre, nie predpoveď sadzieb.`
+    : `We start at rate a; each additional scenario adds ${formattedStep} percentage points. These are sensitivity scenarios, not a rate forecast.`;
+  const scenarios = Array.from({ length: variantCount }, (_, index) => {
+    const increase = index * stepSize;
     const rate = baseRate + increase;
     const payment = monthlyPayment(balance, rate, months);
     return { increase, rate, payment, share: payment / income * 100 };
@@ -1208,6 +1227,7 @@ function resetDecisionTools() {
   document.querySelector("#stressRate").value = editableNumber(3.89);
   document.querySelector("#stressIncome").value = 2400;
   document.querySelector("#stressVariantCount").value = 4;
+  document.querySelector("#stressStepSize").value = 1;
   setDecisionMode("fixation", false);
   renderConsolidation();
   renderStressTest();
@@ -1229,6 +1249,7 @@ function initializeDecisionTools() {
     document.querySelector("#stressRate").value = editableNumber(state.stress.rate);
     document.querySelector("#stressIncome").value = editableNumber(state.stress.income);
     document.querySelector("#stressVariantCount").value = state.stress.variantCount ?? 4;
+    document.querySelector("#stressStepSize").value = stressStepSizes.includes(state.stress.stepSize) ? state.stress.stepSize : 1;
   }
   document.querySelector("#add-loan").addEventListener("click", () => {
     addLoan();
