@@ -27,7 +27,7 @@ const inputs = [...form.querySelectorAll("input")];
 const errorMessage = document.querySelector("#error-message");
 const resultsContent = document.querySelector("#results-content");
 const savedState = document.querySelector("#saved-state");
-const copyLinkButton = document.querySelector("#copy-link");
+const copyScenarioButtons = [...document.querySelectorAll(".copy-scenario")];
 let currentLanguage = navigator.language.toLowerCase().startsWith("sk") ? "sk" : "en";
 
 const englishCopy = {
@@ -55,7 +55,7 @@ const englishCopy = {
   yearsSuffix: "years",
   comparison: "Comparison",
   saved: "Saved locally",
-  shareScenario: "Share scenario",
+  shareScenario: "Copy scenario",
   result: "Comparison result",
   lowerCost: "Lower interest and fees",
   lowerCashflow: "Lower cash outflow",
@@ -698,9 +698,12 @@ function load() {
   document.querySelector("#fixationEndDate").min = todayIso;
 }
 
-async function copyShareLink() {
-  const label = copyLinkButton.querySelector("span");
+async function copyShareLink(event) {
+  const button = event.currentTarget;
+  const label = button.querySelector("span");
   const originalLabel = label.textContent;
+  render();
+  saveDecisionState();
   try {
     await navigator.clipboard.writeText(location.href);
     label.textContent = message("copied");
@@ -720,7 +723,7 @@ async function copyShareLink() {
 }
 
 form.addEventListener("input", render);
-copyLinkButton.addEventListener("click", copyShareLink);
+copyScenarioButtons.forEach((button) => button.addEventListener("click", copyShareLink));
 document.querySelectorAll("[data-language]").forEach((button) => {
   button.addEventListener("click", () => {
     currentLanguage = button.dataset.language;
@@ -742,6 +745,7 @@ document.querySelector("#reset-button").addEventListener("click", () => {
 });
 
 const DECISIONS_STORAGE_KEY = "hypo-advisor:decisions:v1";
+const DECISION_URL_STATE_VERSION = 1;
 const defaultLoans = [
   { balance: 120000, rate: 3.89, months: 264 },
   { balance: 12000, rate: 8.9, months: 60 },
@@ -754,6 +758,55 @@ function readDecisionState() {
   } catch {
     return {};
   }
+}
+
+function encodeDecisionUrlState(state) {
+  const compact = {
+    v: DECISION_URL_STATE_VERSION,
+    m: state.activeDecisionMode,
+    l: state.loans.map((loan) => [loan.balance, loan.rate, loan.months, loan.payment]),
+    c: [state.consolidation.rate, state.consolidation.years, state.consolidation.fees],
+    t: [state.stress.balance, state.stress.years, state.stress.rate, state.stress.income],
+  };
+  return btoa(JSON.stringify(compact)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function decodeDecisionUrlState() {
+  const encoded = new URL(location.href).searchParams.get("d");
+  if (!encoded || encoded.length > 8000) return null;
+  try {
+    const base64 = encoded.replaceAll("-", "+").replaceAll("_", "/");
+    const compact = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")));
+    const finite = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
+    if (compact.v !== DECISION_URL_STATE_VERSION || !["fixation", "consolidation", "stress"].includes(compact.m)) return null;
+    if (!Array.isArray(compact.l) || compact.l.length < 1 || compact.l.length > 20) return null;
+    const loans = compact.l.map((loan) => {
+      if (!Array.isArray(loan) || loan.length !== 4) throw new Error("invalid-loan");
+      const [balance, rate, months, payment] = loan;
+      if (!finite(balance, 100, 100000000) || !finite(rate, 0, 30) || !Number.isInteger(months) || !finite(months, 1, 480)) throw new Error("invalid-loan");
+      if (payment !== null && !finite(payment, 0.01, 10000000)) throw new Error("invalid-payment");
+      return { balance, rate, months, payment };
+    });
+    if (!Array.isArray(compact.c) || compact.c.length !== 3 || !Array.isArray(compact.t) || compact.t.length !== 4) return null;
+    const [rate, years, fees] = compact.c;
+    const [balance, stressYears, stressRate, income] = compact.t;
+    if (!finite(rate, 0, 20) || !Number.isInteger(years) || !finite(years, 1, 40) || !finite(fees, 0, 10000000)) return null;
+    if (!finite(balance, 1000, 100000000) || !Number.isInteger(stressYears) || !finite(stressYears, 1, 40) || !finite(stressRate, 0, 20) || !finite(income, 50, 10000000)) return null;
+    return {
+      activeDecisionMode: compact.m,
+      loans,
+      consolidation: { rate, years, fees },
+      stress: { balance, years: stressYears, rate: stressRate, income },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function updateDecisionUrl(state) {
+  const url = new URL(location.href);
+  url.searchParams.set("d", encodeDecisionUrlState(state));
+  history.replaceState(null, "", url);
 }
 
 function saveDecisionState() {
@@ -774,6 +827,7 @@ function saveDecisionState() {
     },
   };
   localStorage.setItem(DECISIONS_STORAGE_KEY, JSON.stringify(state));
+  updateDecisionUrl(state);
 }
 
 function translateElement(element) {
@@ -1023,7 +1077,7 @@ function resetDecisionTools() {
 }
 
 function initializeDecisionTools() {
-  const state = readDecisionState();
+  const state = decodeDecisionUrlState() || readDecisionState();
   (state.loans?.length ? state.loans : defaultLoans).forEach(addLoan);
   if (state.consolidation) {
     document.querySelector("#conNewRate").value = editableNumber(state.consolidation.rate);

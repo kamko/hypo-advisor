@@ -305,7 +305,7 @@ h1 {
   gap: 5px;
 }
 
-#copy-link {
+.copy-scenario {
   min-height: 34px;
   padding: 7px 10px;
   border: 1px solid var(--line);
@@ -318,7 +318,7 @@ h1 {
   transition: border-color 160ms var(--ease), background 160ms var(--ease);
 }
 
-#copy-link svg {
+.copy-scenario svg {
   width: 15px;
   height: 15px;
   margin-right: 5px;
@@ -330,7 +330,7 @@ h1 {
   vertical-align: -3px;
 }
 
-#copy-link:hover {
+.copy-scenario:hover {
   border-color: var(--primary);
   background: var(--primary-soft);
   color: var(--primary-hover);

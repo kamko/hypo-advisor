@@ -132,9 +132,9 @@
               </div>
               <div class="result-actions">
                 <span id="saved-state" class="saved-state" data-i18n="saved">Uložené lokálne</span>
-                <button id="copy-link" type="button">
+                <button class="copy-scenario" type="button">
                   <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
-                  <span data-i18n="shareScenario">Zdieľať scenár</span>
+                  <span data-i18n="shareScenario">Kopírovať scenár</span>
                 </button>
               </div>
             </div>
@@ -294,7 +294,10 @@
             </section>
           </div>
           <aside class="results compact-results" aria-labelledby="consolidation-results-heading" aria-live="polite">
-            <div class="results-title-row"><div><span class="step">3</span><h2 id="consolidation-results-heading" data-i18n="comparison">Porovnanie</h2></div></div>
+            <div class="results-title-row">
+              <div><span class="step">3</span><h2 id="consolidation-results-heading" data-i18n="comparison">Porovnanie</h2></div>
+              <div class="result-actions"><button class="copy-scenario" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span data-i18n="shareScenario">Kopírovať scenár</span></button></div>
+            </div>
             <div id="consolidation-error" class="error-message" role="alert" hidden></div>
             <div id="consolidation-results">
               <div class="difference-block"><p data-i18n="monthlyRelief">Zmena mesačnej splátky</p><strong id="conHeadline">—</strong><p id="conSummary">—</p></div>
@@ -377,7 +380,10 @@
             </section>
           </div>
           <aside class="results compact-results" aria-labelledby="stress-results-heading" aria-live="polite">
-            <div class="results-title-row"><div><span class="step">2</span><h2 id="stress-results-heading" data-i18n="stressResult">Odolnosť splátky</h2></div></div>
+            <div class="results-title-row">
+              <div><span class="step">2</span><h2 id="stress-results-heading" data-i18n="stressResult">Odolnosť splátky</h2></div>
+              <div class="result-actions"><button class="copy-scenario" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span data-i18n="shareScenario">Kopírovať scenár</span></button></div>
+            </div>
             <div id="stress-error" class="error-message" role="alert" hidden></div>
             <div id="stress-results">
               <div class="difference-block"><p data-i18n="highestScenario">Pri najvyššom scenári</p><strong id="stressHeadline">—</strong><p id="stressSummary">—</p></div>
